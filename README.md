@@ -2,4 +2,21 @@
 
 The intent of this repository is to provide a tutorial on implementation of MOSFET compact models with various complexities.
 
-> This is a work in progress.
+
+## Minimal Charge-Based MOSFET Model (Python)
+
+This small project contains a minimal charge-based MOSFET compact model implemented in Python.
+
+Files:
+- `src/mosfet_model.py` : model implementation (IV, gate charges, small-signal caps).
+- `docs/minimal_charge_based_mosfet.md` : derivation and notes.
+- `examples/run_model.py` : example runner to print IV and charges.
+
+Quick start:
+
+Run the example (ensure Python 3.8+):
+
+```bash
+python3 examples/run_model.py
+```
+
