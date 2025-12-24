@@ -1,0 +1,17 @@
+{
+    "folders": [
+        {
+            "path": ".."
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+        "python.languageServer": "None",
+        "ty.importStrategy": "useBundled",
+        "ty.interpreter": [
+            "${workspaceFolder}/.pixi/envs/default/bin/python"
+        ],
+        "ty.disableLanguageServices": false,
+        "ty.inlayHints.variableTypes": false,
+    }
+}
