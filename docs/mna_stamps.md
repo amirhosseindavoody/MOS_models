@@ -7,7 +7,13 @@ In the following descriptions:
 -   `A[i][j]` is the element in the `i`-th row and `j`-th column of the MNA matrix.
 -   `z[i]` is the `i`-th element of the RHS vector.
 
----
+## Sign conventions
+
+| Current direction    | Jacobian  | RHS       |
+| :--------            | :-------: | :-------: |
+|Current out of Node   | +         | -         |
+|Current into the Node | -         | +         |
+
 
 ## 1. Resistor (R)
 
@@ -130,23 +136,6 @@ z[n1] -= I_eq
 z[n2] += I_eq
 ```
 
-### Derivation and Equations
-
-Using $i(t) = C\,\dfrac{dv(t)}{dt}$ and the Backward Euler approximation
-$$ \frac{dv(t_n)}{dt} \approx \frac{v_n - v_{n-1}}{h}, $$
-we get
-$$ i_n = C\frac{v_n - v_{n-1}}{h} = \frac{C}{h}v_n - \frac{C}{h}v_{n-1}. $$ 
-
-Grouping terms into an equivalent conductance and history current source yields:
-$$ G_{eq} = \frac{C}{h}, $$
-$$ I_{eq} = \frac{C}{h}\,v_{n-1} = G_{eq}\,v_{n-1}. $$ 
-
-When written for two nodes ($n1$ and $n2$) with node voltages $v(n1),v(n2)$ the history current contribution across the pair becomes:
-$$ I_{eq} = \frac{C}{h}\left[v_{n-1}(n1) - v_{n-1}(n2)\right]. $$
-
-These produce the MNA stamps shown above where the conductance uses $G_{eq}$ and the RHS uses $I_{eq}$ with the signs as described earlier.
-
----
 
 ## 5. Inductor (L)
 
@@ -202,31 +191,7 @@ A[k][k]  -= L / h  // from R_eq
 z[k]     -= (L / h) * i_L_{n-1} // from V_eq
 ```
 
-### Derivation and Equations
-
-Using $v(t) = L\,\dfrac{di(t)}{dt}$ and Backward Euler
-$$
-\frac{di_{L}(t_n)}{dt} \approx \frac{i_{L,n} - i_{L,n-1}}{h},
-$$
-we obtain
-$$
-v_n = L\frac{i_{L,n} - i_{L,n-1}}{h} = \frac{L}{h}i_{L,n} - \frac{L}{h}i_{L,n-1}.
-$$ 
-
-Rearranging into an equivalent series resistance and source gives:
-$$
-R_{eq} = \frac{L}{h},
-$$
-
-$$
-V_{eq} = \frac{L}{h}i_{L,n-1} = R_{eq}\,i_{L,n-1}.
-$$ 
-
-In the MNA stamp the term $-R_{eq}$ appears on the diagonal for the inductor current variable (because the stamp is formed to move the series resistance term to the current-equation row), and the history voltage $V_{eq}$ contributes to the RHS as shown above.
-
----
-
-## 6. Diode
+## 6. Shockley Diode
 
 A diode is a non-linear component. Its model is linearized at each iteration of the Newton-Raphson algorithm. The linearized model consists of a conductance `g_eq` in parallel with a current source `I_eq`.
 
@@ -260,29 +225,6 @@ z[n1] -= I_eq
 z[n2] += I_eq
 ```
 
-### Derivation and Equations
-
-Start from the Shockley equation
-$$I_d(V_d) = I_s\left(e^{\frac{V_d}{nV_t}} - 1\right).$$
-The small-signal conductance (derivative) is
-$$
-g_{eq} = \frac{dI_d}{dV_d} = \frac{I_s}{nV_t}e^{\frac{V_d}{nV_t}}.
-$$ 
-
-At iteration $k$ evaluate at $V_d^k$:
-$$
-g_{eq} = \left.\frac{dI_d}{dV_d}\right|_{V_d^k} = \frac{I_s}{nV_t}e^{\frac{V_d^k}{nV_t}}.
-$$ 
-
-The linearized current source (history term) is obtained from the first-order Taylor expansion:
-$$
-I_{eq} = I_d(V_d^k) - g_{eq}\,V_d^k.
-$$ 
-
-So the diode is replaced by a conductance $g_{eq}$ in parallel with a current source $I_{eq}$ whose values are updated each Newton-Raphson iteration.
-
----
-
 ## 7. MOSFET
 
 A MOSFET is a non-linear component with four terminals: drain (d), gate (g), source (s), and bulk (b). It is also linearized for the Newton-Raphson solver.
@@ -299,14 +241,20 @@ The linearized model includes the drain-source current `I_ds` and its derivative
 
 #### Derivation
 The MOSFET drain current $I_{ds} = f(V_{gs}, V_{ds}, V_{bs})$ is a non-linear function of its terminal voltages. We linearize it using a multi-variable Taylor expansion around the voltages from the previous iteration ($V_{gs}^k, V_{ds}^k, V_{bs}^k$):
-$$ I_{ds}^{k+1} \approx I_{ds}^k + \frac{\partial I_{ds}}{\partial V_{gs}}\bigg|_k (V_{gs}^{k+1} - V_{gs}^k) + \frac{\partial I_{ds}}{\partial V_{ds}}\bigg|_k (V_{ds}^{k+1} - V_{ds}^k) + \frac{\partial I_{ds}}{\partial V_{bs}}\bigg|_k (V_{bs}^{k+1} - V_{bs}^k) $$
+$$
+I_{ds}^{k+1} \approx I_{ds}^k + \frac{\partial I_{ds}}{\partial V_{gs}}\bigg|_k (V_{gs}^{k+1} - V_{gs}^k) + \frac{\partial I_{ds}}{\partial V_{ds}}\bigg|_k (V_{ds}^{k+1} - V_{ds}^k) + \frac{\partial I_{ds}}{\partial V_{bs}}\bigg|_k (V_{bs}^{k+1} - V_{bs}^k) 
+$$
 Substituting the small-signal parameters $g_m, g_{ds}, g_{mbs}$:
-$$ I_{ds}^{k+1} \approx I_{ds}^k + g_m(V_{gs}^{k+1} - V_{gs}^k) + g_{ds}(V_{ds}^{k+1} - V_{ds}^k) + g_{mbs}(V_{bs}^{k+1} - V_{bs}^k) $$
+$$
+I_{ds}^{k+1} \approx I_{ds}^k + g_m(V_{gs}^{k+1} - V_{gs}^k) + g_{ds}(V_{ds}^{k+1} - V_{ds}^k) + g_{mbs}(V_{bs}^{k+1} - V_{bs}^k)
+$$
 The MNA formulation requires separating terms for the current iteration $(k+1)$ on the left side (Jacobian) and previous iteration $(k)$ on the right side (RHS).
-$$ I_{ds}^{k+1} - g_m V_{gs}^{k+1} - g_{ds} V_{ds}^{k+1} - g_{mbs} V_{bs}^{k+1} = \underbrace{I_{ds}^k - g_m V_{gs}^k - g_{ds} V_{ds}^k - g_{mbs} V_{bs}^k}_{I_{eq}} $$
+$$
+I_{ds}^{k+1} - g_m V_{gs}^{k+1} - g_{ds} V_{ds}^{k+1} - g_{mbs} V_{bs}^{k+1} = \underbrace{I_{ds}^k - g_m V_{gs}^k - g_{ds} V_{ds}^k - g_{mbs} V_{bs}^k}_{I_{eq}}
+$$
 The terms on the left form the Jacobian stamp, while the terms on the right are collected into the equivalent current source $I_{eq}$ for the RHS vector.
 
--   **MNA Stamp** (for the Jacobian and RHS):
+- **MNA Stamp** (for the Jacobian and RHS):
 
 ```
 // Jacobian (conductance) stamp
@@ -325,30 +273,6 @@ A[s][b] -= gmbs
 z[d] -= I_eq
 z[s] += I_eq
 ```
-
-### Derivation and Equations
-
-Let $I_{ds}=f(V_{gs},V_{ds},V_{bs})$. The small-signal parameters are the partial derivatives evaluated at the operating point ($k$):
-$$
-g_m = \left.\frac{\partial I_{ds}}{\partial V_{gs}}\right|_k,\qquad g_{ds} = \left.\frac{\partial I_{ds}}{\partial V_{ds}}\right|_k,\qquad g_{mbs} = \left.\frac{\partial I_{ds}}{\partial V_{bs}}\right|_k.
-$$ 
-
-Linearizing $I_{ds}$ using a first-order Taylor expansion about the point ($V_{gs}^k,V_{ds}^k,V_{bs}^k$) gives:
-$$
-I_{ds}^{k+1} \approx I_{ds}^k + g_m\left(V_{gs}^{k+1}-V_{gs}^k\right) + g_{ds}\left(V_{ds}^{k+1}-V_{ds}^k\right) + g_{mbs}\left(V_{bs}^{k+1}-V_{bs}^k\right).
-$$
-
-Rearranging to collect the $(k+1)$ terms on the left and history terms on the right yields the Jacobian and RHS representations:
-$$
-I_{ds}^{k+1} - g_mV_{gs}^{k+1} - g_{ds}V_{ds}^{k+1} - g_{mbs}V_{bs}^{k+1} = I_{ds}^k - g_mV_{gs}^k - g_{ds}V_{ds}^k - g_{mbs}V_{bs}^k.
-$$ 
-
-Thus the equivalent RHS current used in the MNA vector is
-$$
-I_{eq} = I_{ds}^k - g_mV_{gs}^k - g_{ds}V_{ds}^k - g_{mbs}V_{bs}^k.
-$$ 
-
-Each transistor capacitance (e.g., $C_{gs},C_{gd},C_{gb}$) is converted to an equivalent conductance and history current in transient analysis exactly like the capacitor case, using $G_{eq}=C/h$ and history currents formed from the previous time-step charges/voltages.
 
 ### Transient Analysis
 

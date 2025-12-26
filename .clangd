@@ -1,0 +1,17 @@
+CompileFlags:
+  # CompilationDatabase: build
+  #####
+  # When compiling using g++ and gcc some flags may not be present in clang
+  # and cause clangd to complain about missing flags.
+  # The following removes some of those flags.
+  Remove:
+    - "-fmodules-ts"
+    - "-fmodule-mapper=*"
+    - "-fdeps-format=*"
+
+  # # Add conda environment include paths for standard library
+  # Add:
+  #   - -I/home/amirhossein/mini-spice/.pixi/envs/default/lib/gcc/x86_64-conda-linux-gnu/15.2.0/include
+  #   - -I/home/amirhossein/mini-spice/.pixi/envs/default/lib/gcc/x86_64-conda-linux-gnu/15.2.0/include/c++
+  #   - -I/home/amirhossein/mini-spice/.pixi/envs/default/lib/gcc/x86_64-conda-linux-gnu/15.2.0/include/c++/x86_64-conda-linux-gnu
+  #   - -I/home/amirhossein/mini-spice/.pixi/envs/default/x86_64-conda-linux-gnu/sysroot/usr/include

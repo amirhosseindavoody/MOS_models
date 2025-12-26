@@ -1,0 +1,48 @@
+{
+    "version": 4,
+    "configurePresets": [
+        {
+            "name": "release",
+            "hidden": false,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
+                "CMAKE_C_FLAGS": "-g -O3",
+                "CMAKE_CXX_FLAGS": "-g -O3"
+            }
+        },
+        {
+            "name": "debug",
+            "hidden": false,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "-g -Wall",
+                "CMAKE_CXX_FLAGS": "-g -Wall -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug Build",
+            "configurePreset": "debug",
+            "jobs": 4,
+            "cleanFirst": false
+        },
+        {
+            "name": "release",
+            "displayName": "Release Build",
+            "configurePreset": "release",
+            "jobs": 4,
+            "cleanFirst": false
+        }
+    ]
+}
