@@ -12,8 +12,7 @@ The simulator will be built around a few key components:
 -   **Circuit Representation**: An in-memory data structure (e.g., a graph or an adjacency list) to represent the circuit, its nodes, and components.
 -   **Equation Engine (Modified Nodal Analysis - MNA)**: The core of the simulator. It will build the system of equations representing the circuit using MNA.
 -   **Solver**: A numerical solver for the system of equations. This will involve:
-    -   A linear solver for DC analysis of linear circuits.
-    -   A non-linear solver (e.g., Newton-Raphson) for DC analysis of non-linear circuits.
+    -   A Newton-Raphson solver for DC analysis (handles both linear and non-linear circuits; linear converges in 1 iteration).
     -   A numerical integration method (e.g., Backward Euler or Trapezoidal Rule) for transient analysis.
 -   **Device Model Library**: A collection of models for each supported circuit component.
 
@@ -21,11 +20,12 @@ The simulator will be built around a few key components:
 
 ### 3.1. DC Analysis
 
--   **Functionality**: Computes the DC operating point of the circuit.
+-   **Functionality**: Computes the DC operating point of the circuit using Newton-Raphson iteration.
 -   **Implementation**:
-    1.  The MNA engine will create a system of linear or non-linear algebraic equations.
-    2.  For linear circuits, solve `Ax = b` directly.
-    3.  For non-linear circuits, use the Newton-Raphson method to iteratively solve for the node voltages. This requires each non-linear component to provide its current contribution and its derivative (Jacobian entry).
+    1.  The MNA engine will create a system of algebraic equations.
+    2.  Use the Newton-Raphson method to iteratively solve for the node voltages. Each component provides its current contribution and its derivative (Jacobian entry).
+    3.  For linear circuits, NR converges in 1 iteration (constant Jacobian).
+    4.  For non-linear circuits, NR iterates multiple times until convergence.
 
 ### 3.2. Transient Analysis
 
@@ -72,32 +72,30 @@ For non-linear devices, the model must provide its current contribution and the 
 
 The development can be broken down into the following phases:
 
--   **Phase 1: Core DC Simulator for Linear Circuits**
+-   **Phase 1: Core DC Simulator (Linear & Nonlinear)**
     1.  Implement the netlist parser for R, L, C, V, I sources.
     2.  Build the circuit representation data structure.
-    3.  Implement the MNA engine for linear resistive circuits.
-    4.  Implement a linear solver for the `Ax = b` system.
-    5.  Add support for inductors and DC voltage sources.
-    6.  Write tests to verify DC analysis with simple linear circuits.
+    3.  Implement the MNA engine with the `StampContext` API for device stamping.
+    4.  Implement the Newton-Raphson solver (unified for both linear and nonlinear circuits).
+    5.  Create device models: Resistor, DC Voltage Source, DC Current Source.
+    6.  Verify DC analysis with simple linear resistive circuits (NR converges in 1 iteration).
+    7.  Create device models: Diode (Shockley), MOSFET (Level 1 square-law).
+    8.  Integrate nonlinear models and verify DC operating points with transistor circuits.
+    9.  Write comprehensive unit tests for all device stamps.
 
--   **Phase 2: Non-Linear DC Analysis**
-    1.  Implement the Newton-Raphson solver.
-    2.  Create the device model for the Diode.
-    3.  Integrate the Diode model into the MNA engine and Newton-Raphson solver.
-    4.  Create the device model for the MOSFET (Level 1 model).
-    5.  Integrate the MOSFET model.
-    6.  Write tests for DC operating points of circuits with diodes and transistors.
+-   **Phase 2: Transient Analysis**
+    1.  Implement the time-stepping loop with Backward Euler integration.
+    2.  Create transient models for Capacitor and Inductor using equivalent conductance + history RHS.
+    3.  Implement `update_state()` hook for reactive devices to store history (voltage/current).
+    4.  Integrate transient models with NR solver inside the time-stepping loop.
+    5.  Add support for time-varying sources (e.g., PWL, SIN, PULSE).
+    6.  Write tests for simple transient circuits (e.g., RC charging, RL, RLC oscillation).
 
--   **Phase 3: Transient Analysis**
-    1.  Implement the time-stepping loop.
-    2.  Implement the Backward Euler (or Trapezoidal) integration method.
-    3.  Update Capacitor and Inductor models to support their transient behavior.
-    4.  Integrate the transient models with the MNA engine and solvers.
-    5.  Add support for time-varying sources (e.g., PWL, SIN).
-    6.  Write tests for simple transient circuits (e.g., RC, RL, RLC).
-
--   **Phase 4: Refinement and Expansion**
-    1.  Improve the netlist parser with more features (.MODEL cards, etc.).
+-   **Phase 3: Advanced Models & Optimization**
+    1.  Improve MOSFET model with charge-based formulation (see [minimal_charge_based_mosfet.md](minimal_charge_based_mosfet.md)).
+    2.  Add diode junction capacitance for transient accuracy.
+    3.  Improve netlist parser with .MODEL and .PARAM cards.
+    4.  Optimize matrix assembly and solver for larger circuits.
     2.  Enhance plotting and output capabilities.
     3.  Implement more advanced device models.
     4.  Performance optimizations.

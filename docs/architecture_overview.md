@@ -31,9 +31,10 @@ Mini-SPICE is an educational circuit simulator designed to perform DC and transi
         │                         │               │
 ┌───────▼────────┐    ┌──────────▼──────┐  ┌─────▼──────┐
 │  DC Analysis   │    │ Transient       │  │  Future:   │
-│  • Linear      │    │ Analysis        │  │  • AC      │
-│  • Nonlinear   │    │ • Time stepping │  │  • Noise   │
-│    (NR iter.)  │    │ • Integration   │  │  • etc.    │
+│  (NR Newton-   │    │ Analysis        │  │  • AC      │
+│   Raphson)     │    │ • Time stepping │  │  • Noise   │
+│  • Linear &    │    │ • Integration   │  │  • etc.    │
+│    Nonlinear   │    │ • NR iterations │  │            │
 └────┬───────────┘    └────────┬────────┘  └────────────┘
      │                         │
      └────────────┬────────────┘
@@ -105,8 +106,7 @@ Each device type implements a **virtual function table (vtable)** with six hooks
 | Hook | Purpose |
 |------|---------|
 | `init()` | One-time initialization; allocate extra variables |
-| `stamp_dc()` | DC analysis stamping (linear devices) |
-| `stamp_nonlinear()` | Jacobian and RHS for NR iterations |
+| `stamp_nonlinear()` | Jacobian and RHS for NR iterations (used for all DC analysis) |
 | `stamp_transient()` | Time-discretized stamping (reactive devices) |
 | `update_state()` | Store history after successful time-step |
 | `free()` | Cleanup and memory deallocation |
@@ -117,41 +117,35 @@ The simulator kernel loops over all devices, calling the appropriate hook for th
 
 ## 3. Analysis Modes
 
-### 3.1 DC Linear Analysis
+### 3.1 DC Analysis
 
-**Goal:** Solve $A \cdot x = z$ for circuits with only linear elements.
+**Goal:** Solve the DC operating point of the circuit using Newton–Raphson iteration. This unified approach handles both linear and nonlinear elements.
 
-**Flow:**
-1. Reset `StampContext`
-2. For each device: call `stamp_dc()`
-3. Assemble `A` and `z` from collected triplets
-4. Solve directly using a linear solver (LAPACK, sparse direct, etc.)
-5. Output node voltages and device operating points
-
-**Supported devices:** Resistor, DC voltage/current sources
-
-### 3.2 DC Nonlinear Analysis
-
-**Goal:** Solve circuits with nonlinear elements using Newton–Raphson iteration.
+**Why Newton–Raphson for all DC analysis:**
+- For linear circuits, NR converges in one iteration (the Jacobian is constant)
+- For nonlinear circuits, NR iterates to the solution
+- Single implementation handles both cases, avoiding code duplication
 
 **Flow:**
-1. Initialize x (e.g., from linear solution or zeros)
+1. Initialize x (e.g., all zeros or educated guess)
 2. **Newton–Raphson loop** (iterate until convergence):
    - Reset `StampContext`
    - For each device: call `stamp_nonlinear()` with current x guess
-   - Assemble Jacobian `A` and residual RHS
+   - Assemble Jacobian `A` and residual RHS based on device physics
    - Solve $A \cdot \Delta x = -F(x)$ for the Newton step
    - Update $x \gets x + \Delta x$
    - Check convergence: $||\Delta x|| < \epsilon$
 3. When converged, output DC operating point
 
-**Supported devices:** All DC devices + Diode, MOSFET
+**Supported devices:** Resistor, DC voltage/current sources (linear devices, converge in 1 NR iteration), Diode, MOSFET (nonlinear devices, multiple NR iterations)
 
 **Key concepts:**
-- Jacobian assembly: each device contributes $\frac{\partial I}{\partial V}$ (conductance, transconductance, etc.)
-- RHS residual includes history/bias currents needed for linearization accuracy
+- **Jacobian assembly:** Each device contributes $\frac{\partial I}{\partial V}$ (conductance for linear devices, small-signal conductance for nonlinear devices)
+- **For linear devices:** The Jacobian is constant, and NR solves the problem exactly in one iteration
+- **For nonlinear devices:** The Jacobian changes with voltage, and NR iterates to convergence
+- **RHS:** Includes source contributions and history/bias terms needed for linearization accuracy
 
-### 3.3 Transient Analysis
+### 3.2 Transient Analysis
 
 **Goal:** Compute circuit response over time using implicit time-stepping.
 
@@ -175,12 +169,12 @@ The simulator kernel loops over all devices, calling the appropriate hook for th
    - Advance time: $t \gets t + h$; $x_{n-1} \gets x_n$
    - Output time-series point
 
-**Supported devices:** All linear DC + Capacitor, Inductor + nonlinear devices
+**Supported devices:** All DC devices + Capacitor, Inductor + nonlinear devices
 
-**Key differences from DC nonlinear:**
-- Reactive devices generate equivalent conductances and history currents
-- State must be updated after each successful step
-- History terms couple the current step to previous steps
+**Key differences from DC analysis:**
+- Reactive devices (capacitor, inductor) generate equivalent conductances and history currents based on time-step size
+- State must be updated after each successful time-step to store history (previous voltages, currents)
+- History terms couple the current step to previous steps via Backward Euler discretization
 
 ---
 
@@ -263,25 +257,28 @@ The simulator uses pluggable solver interfaces for flexibility:
 
 ## 5. Workflow Examples
 
-### 5.1 Simple DC Resistive Circuit
+### 5.1 DC Analysis: Resistive Divider
 
 ```
-Circuit: Vdd=10V -> R1=1k -> GND
-         Vdd=10V -> R2=1k -> GND  (parallel)
+Circuit: Vdd=10V -> R1=1k -> R2=1k -> GND
 ```
 
 **Steps:**
-1. Parse netlist → 2 nodes (Vdd, GND) + 2 resistors + 1 voltage source
-2. Finalize circuit → Node indices: GND=0, Vdd=1; no extra vars
-3. Reset `StampContext`
-4. Resistor 1: `stamp_dc()` → $g_1 = 0.001$, stamp into (1,1) and (0,0)
-5. Resistor 2: `stamp_dc()` → $g_2 = 0.001$, stamp into (1,1) and (0,0)
-6. Voltage source: `stamp_dc()` → enforce $V_1 = 10$, add extra row/col
-7. Assemble: $A$ matrix 3×3, $z = [?, 10, ?]$
-8. Solve: $x_1 = 10V$, $x_{branch} = 20mA$
-9. Output: Voltages at each node, source current
+1. Parse netlist → 3 nodes (Vdd, mid, GND) + 2 resistors + 1 voltage source
+2. Finalize circuit → Node indices: GND=0, mid=1, Vdd=2; 1 extra var (V-source current)
+3. Initialize NR: $x = [0, 5, 10, 0]$ (guess)
+4. **NR Iteration 1:**
+   - Resistor 1: `stamp_nonlinear()` → $g = 0.001$, constant Jacobian contribution
+   - Resistor 2: `stamp_nonlinear()` → $g = 0.001$, constant Jacobian contribution
+   - Voltage source: `stamp_nonlinear()` → enforce $V_{dd} = 10$
+   - Assemble: $A$ matrix, $z$
+   - Solve for $\Delta x$ (should be zero for linear circuit)
+   - Check convergence: $||\Delta x|| < \epsilon$ → **CONVERGED in 1 iteration**
+5. Output: $V_{mid} = 5V$, source current = 10mA
 
-### 5.2 DC Nonlinear: Diode Circuit
+**Note:** Linear circuits converge in 1 NR iteration because the Jacobian is constant.
+
+### 5.2 DC Analysis: Diode Circuit
 
 ```
 Circuit: Vdd=5V -> R=1k -> Diode -> GND
@@ -289,19 +286,22 @@ Circuit: Vdd=5V -> R=1k -> Diode -> GND
 
 **Steps:**
 1. Parse and finalize: Nodes (Vdd, anode, GND); 1 resistor, 1 diode, 1 V-source
-2. Initialize NR: $x = [5, 0.6, 0]$ (guess cathode ~0.6V, diode conducting)
+2. Initialize NR: $x = [0, 0.6, 5]$ (guess diode anode ~0.6V, Vdd=5V)
 3. **NR Iteration 1:**
-   - Resistor: `stamp_dc()` → add conductance
+   - Resistor: `stamp_nonlinear()` → conductance $g = 0.001$ (constant)
    - Diode: `stamp_nonlinear()` → compute $I_d$ and $g_{eq}$ for current x guess
      - If $V_d = 0.6V$, then $I_d \approx I_s e^{0.6/(nV_t)}$
-     - $g_{eq} = dI_d/dV_d$
+     - Linearized conductance: $g_{eq} = dI_d/dV_d = (I_s/(nV_t))e^{0.6/(nV_t)}$
    - Voltage source: enforce $V_{dd} = 5V$
-   - Assemble and solve for $\Delta x$
-   - Check $||\Delta x|| < \epsilon$
-4. Continue until converged
+   - Assemble Jacobian and RHS
+   - Solve for $\Delta x$
+   - Check convergence: $||\Delta x|| < \epsilon$
+4. **NR Iteration 2, 3, ...:** Continue until converged (typically 3-5 iterations for diodes)
 5. Output: Node voltages, diode current, power dissipation
 
-### 5.3 Transient: RC Step Response
+**Note:** Nonlinear devices require multiple NR iterations because their Jacobian (conductance) changes with voltage.
+
+### 5.3 Transient Analysis: RC Step Response
 
 ```
 Circuit: Vsrc (PWL: 0→5V at t=0) -> R -> C -> GND
@@ -309,20 +309,21 @@ Circuit: Vsrc (PWL: 0→5V at t=0) -> R -> C -> GND
 
 **Steps:**
 1. Parse and finalize: Nodes (source, junction, GND); capacitor uses no extra var
-2. Initialize: $x = 0$, $h = 0.1\mu s$, $t = 0$
-3. **Time-step loop (t = 0, 0.1, 0.2, ... T_end):**
-   - Set $x_{prev}$ from prior step (or 0 for t=0)
+2. Initialize: $x = [0, 0, 0]$, $h = 1\mu s$, $t = 0$, $x_{prev} = [0, 0, 0]$
+3. **Time-step loop (t = 0, 1, 2, ... T_end):**
+   - Set time-step state: $h$, $t$, $x_{prev}$
    - Initialize NR: $x = x_{prev}$
-   - **NR iteration:**
-     - Resistor: `stamp_transient()` → adds conductance (time-invariant)
-     - Capacitor: `stamp_transient()` → adds $G_{eq} = C/h$ and history current $I_{eq} = G_{eq}(v_{prev})$
-     - Voltage source: enforces $V_{src}(t)$
-     - Solve and update x
+   - **NR iteration loop:**
+     - Resistor: `stamp_nonlinear()` → adds conductance
+     - Capacitor: `stamp_nonlinear()` → adds $G_{eq} = C/h$ and history RHS $I_{eq} = G_{eq}(v_{prev})$
+     - Voltage source: enforces $V_{src}(t)$ (time-varying if PWL, SIN, etc.)
+     - Assemble and solve for $\Delta x$
+     - Check convergence: $||\Delta x|| < \epsilon$
    - When converged:
-     - Capacitor: `update_state()` → stores $v_{prev} = x_{capacitor}$
-     - Advance $t \gets t + h$
+     - Capacitor: `update_state()` → stores $v_{prev,new} = x_{capacitor}$
+     - Advance $t \gets t + h$; $x_{prev} \gets x$
      - Record $(t, x)$ for output
-4. Plot voltage rise curve: exponential charging with time constant RC
+4. Plot voltage rise curve: exponential charging with time constant $RC \approx 1 \mu s$
 
 ---
 

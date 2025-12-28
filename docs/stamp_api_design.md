@@ -13,7 +13,8 @@ This design document defines the C/C++ API and data structures for device stampi
 - **Stamp:** device contributions to the MNA matrix `A` and RHS `z` for the current analysis step/iteration.
 - **StampContext:** arena used during assembly; devices append triplets and RHS updates to it.
 - **Variable indexing:** global indexing of node voltages plus extra branch variables (voltage-source currents, inductor currents).
-- **Device lifecycle hooks:** init, stamp (dc/nonlinear/transient), update_state, free.
+- **Device lifecycle hooks:** init, stamp_nonlinear (for all DC analysis), stamp_transient (for transient), update_state, free.
+- **Unified DC approach:** Newton-Raphson iteration is used for both linear and nonlinear DC circuits; linear devices have constant Jacobians and converge in 1 iteration.
 
 **Top-level Data Types**
 - `Circuit` - holds node map, device list, and `num_vars`.
@@ -246,9 +247,8 @@ static const DeviceVTable resistor_vt = {
 ```c
 typedef struct DeviceVTable {
   void (*init)(Device *d, Circuit *c);
-  void (*stamp_dc)(Device *d, StampContext *ctx);
-  void (*stamp_nonlinear)(Device *d, StampContext *ctx, IterationState *it);
-  void (*stamp_transient)(Device *d, StampContext *ctx, TimeStepState *ts);
+  void (*stamp_nonlinear)(Device *d, StampContext *ctx, IterationState *it); // used for all DC analysis
+  void (*stamp_transient)(Device *d, StampContext *ctx, TimeStepState *ts);    // used for transient analysis
   void (*update_state)(Device *d, double *x, TimeStepState *ts);
   void (*free)(Device *d);
 } DeviceVTable;
@@ -345,28 +345,29 @@ struct TimeStepState {
 
 **Assembly and solution flows**
 
-- DC linear flow:
-  1. ctx_reset
-  2. for each device: stamp_dc
-  3. A = ctx_assemble_matrix(ctx)
-  4. solver->solve(A, z, x)
-
-- DC nonlinear (Newton-Raphson):
-  1. initialize x (e.g., linear solve or zeros)
+- DC analysis (Newton-Raphson, unified for linear and nonlinear):
+  1. initialize x (e.g., zeros)
   2. loop until converge:
      - ctx_reset
      - for each device: stamp_nonlinear(device, ctx, it)
-     - assemble A, z
+     - assemble A, z (Jacobian and residual RHS)
      - solve for delta_x (A * delta_x = -F)
      - update x
+  3. Note: linear circuits converge in 1 iteration; nonlinear circuits iterate until convergence
 
-- Transient (Backward Euler):
+- Transient (Backward Euler with Newton-Raphson inner loop):
   1. initialize TimeStepState with x_prev
   2. for each time step:
      - ts.h = h; ts.t = t
      - initialize x guess (x_prev)
-     - iterate NR (if nonlinear): stamp_transient for each device, assemble, solve
-     - on converge: for each device call update_state(device, x, ts)
+     - iterate NR (Newton-Raphson loop):
+       - ctx_reset
+       - for each device: stamp_transient(device, ctx, ts)
+       - assemble A, z (includes reactive devices' equivalent conductance + history terms)
+       - solve for delta_x
+       - update x
+       - check convergence
+     - on converge: for each device call update_state(device, x, ts) to store history
      - x_prev = x; advance time
 
 **Testing matrix & validation**
