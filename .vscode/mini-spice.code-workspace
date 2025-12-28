@@ -14,11 +14,11 @@
             "test_workarea": true,
             "**/.vscode": true,
         },
-        "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+        "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/py/bin/python",
         "python.languageServer": "None",
         "ty.importStrategy": "useBundled",
         "ty.interpreter": [
-            "${workspaceFolder}/.pixi/envs/default/bin/python"
+            "${workspaceFolder}/.pixi/envs/py/bin/python"
         ],
         "ty.disableLanguageServices": false,
         "ty.inlayHints.variableTypes": false,
@@ -155,5 +155,12 @@
             "-std=c++17",
             "-stdlib=libc++"
         ],
+        // CMake Tools extension settings
+        "cmake.cmakePath": "${workspaceFolder}/.pixi/envs/default/bin/cmake",
+        "[cmake]": {
+            "editor.defaultFormatter": "KylinIdeTeam.cmake-intellisence",
+        },
+        "cmake.configureOnEdit": false,
+        "cmake.configureOnOpen": false,
     }
 }

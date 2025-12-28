@@ -3,10 +3,8 @@
 import sys
 import os
 
-# ensure project root is on sys.path so `src` package can be imported when running as a script
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.mosfet_model import (
+from mosfet_model import (
     MOSFETParams,
     drain_current,
     total_gate_charge,

@@ -11,11 +11,7 @@ test = { cmd = "ctest --preset=release --output-on-failure", depends-on = [
     "build",
 ] }
 
-[dependencies]
-python = ">=3.13,<3.14"
-numpy = ">=2.3.5,<3"
-gcc = ">=15.2.0,<15.3"
-gxx = ">=15.2.0,<15.3"
+[feature.c.dependencies]
 cmake = ">=4.2.1,<5"
 libcxx = ">=21.1.8,<22"
 c-compiler = ">=1.0.0,<2"
@@ -29,3 +25,12 @@ clang-format = ">=21.1.7,<22"
 compiler-rt = ">=21.1.7,<22"
 gdb = ">=17.1,<18"
 elfutils = ">=0.194,<0.195"
+
+[feature.py.dependencies]
+numpy = ">=2.4.0,<3"
+python = ">=3.13.11,<3.14"
+
+[environments]
+default = { features = ["c", "py"] }
+c = { features = ["c"], no-default-feature = false }
+py = { features = ["py"], no-default-feature = false }

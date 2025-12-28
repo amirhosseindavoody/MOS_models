@@ -93,6 +93,154 @@ solver->solve(solver, A, ctx->z, x);
 Devices should never assume the solver's internal matrix layout — they only interact with `StampContext` via `ctx_add_A` and `ctx_add_z`.
 
 
+## Device vtable: Role and Design
+
+The **vtable (virtual function table)** is a C-style mechanism for achieving **polymorphism** without using C++. It allows the simulator to work with many different device types (resistors, capacitors, transistors, diodes, etc.) through a single generic `Device` interface, with each device type providing its own implementation of stamping, initialization, and state management.
+
+### Why vtable?
+
+- **Polymorphic behavior:** Different devices implement the same interface but with completely different physics. A resistor's stamp is purely ohmic; a diode's is exponential; a MOSFET's involves multiple coupled equations. The vtable lets the core simulator loop call `device->vt->stamp_dc(device, ctx)` without knowing the specific device type.
+- **Extensibility:** New device types (e.g., BJT, JFET, voltage-controlled sources) can be added by defining a new vtable and device struct without modifying the simulator kernel.
+- **C-compatible:** This design uses plain C function pointers rather than C++ virtual methods, making it portable and suitable for embedding in other tools.
+
+### The Device vtable interface
+
+```c
+typedef struct DeviceVTable {
+  void (*init)(Device *d, Circuit *c);
+  void (*stamp_dc)(Device *d, StampContext *ctx);
+  void (*stamp_nonlinear)(Device *d, StampContext *ctx, IterationState *it);
+  void (*stamp_transient)(Device *d, StampContext *ctx, TimeStepState *ts);
+  void (*update_state)(Device *d, double *x, TimeStepState *ts);
+  void (*free)(Device *d);
+} DeviceVTable;
+
+struct Device {
+  const DeviceVTable *vt;
+  int nodes[4]; // generic terminal indices: use -1 for unused terminals
+  void *params; // device-specific parameters (e.g., resistor value, diode Is)
+  void *state;  // device-specific state (history, prev voltages, prev currents)
+  int extra_var; // index of extra variable if allocated (for voltage sources, inductors)
+};
+```
+
+### Vtable methods explained
+
+Each function pointer in the vtable defines a lifecycle hook:
+
+- **`init(Device *d, Circuit *c)`**
+  - Called once after the device is added to the circuit but before any analysis begins.
+  - Allows the device to initialize internal state, validate parameters, and allocate extra variables if needed (e.g., voltage source branch current, inductor current).
+  - Example: a voltage source calls `ctx_alloc_extra_var()` to obtain its extra variable index for the branch current.
+
+- **`stamp_dc(Device *d, StampContext *ctx)`**
+  - Called during each DC linear analysis to push the device's contributions to the MNA matrix and RHS.
+  - Used for linear devices (resistor, linear current/voltage sources) or DC biasing of nonlinear devices.
+  - Example: a resistor with value R and nodes n1, n2 stamps the conductance 1/R into the matrix.
+
+- **`stamp_nonlinear(Device *d, StampContext *ctx, IterationState *it)`**
+  - Called during each Newton–Raphson iteration of a DC nonlinear analysis or transient solve.
+  - Allows the device to compute its operating point for the current guess vector (stored in `it->x_current`) and stamp the Jacobian (linearized conductance) and nonlinear RHS contribution.
+  - Example: a diode computes its exponential current and small-signal conductance around the current voltage estimate.
+
+- **`stamp_transient(Device *d, StampContext *ctx, TimeStepState *ts)`**
+  - Called during each transient time-step to stamp contributions that include time-derivative or history terms.
+  - Used for reactive devices (capacitors, inductors) and implicit time-stepping schemes (Backward Euler, trapezoidal).
+  - Example: a capacitor stamps an equivalent conductance and current source based on the previous step's voltage and the time-step size.
+
+- **`update_state(Device *d, double *x, TimeStepState *ts)`**
+  - Called after a successful transient time-step solution to allow the device to update its internal state with the new solution vector `x`.
+  - Used to store history needed for the next time-step (previous voltages, currents, flux linkages).
+  - Example: a capacitor stores `v_prev = x[n1] - x[n2]` for the next step; an inductor stores `i_prev`.
+
+- **`free(Device *d)`**
+  - Called when the device is destroyed (circuit cleanup) to deallocate any device-specific memory (params, state).
+
+### Calling convention in the simulator kernel
+
+The simulator kernel typically loops over all devices and calls the appropriate vtable method:
+
+```c
+// DC linear analysis
+for (Device *d = circuit->devices; d != NULL; d = d->next) {
+    d->vt->stamp_dc(d, ctx);
+}
+
+// NR iteration during transient
+for (Device *d = circuit->devices; d != NULL; d = d->next) {
+    d->vt->stamp_nonlinear(d, ctx, iteration_state);
+}
+
+// After converged transient step
+for (Device *d = circuit->devices; d != NULL; d = d->next) {
+    d->vt->update_state(d, x, time_step_state);
+}
+```
+
+### Device implementation example (pseudocode)
+
+A resistor implementation provides:
+
+```c
+struct ResistorParams {
+  double R; // resistance in ohms
+};
+
+struct ResistorState {
+  // resistor is memoryless; no state needed
+};
+
+static void resistor_init(Device *d, Circuit *c) {
+  // nothing to do; R is stored in params
+}
+
+static void resistor_stamp_dc(Device *d, StampContext *ctx) {
+  ResistorParams *p = (ResistorParams *)d->params;
+  double g = 1.0 / p->R;
+  int n1 = d->nodes[0], n2 = d->nodes[1];
+  ctx_add_A(ctx, n1, n1, +g);
+  ctx_add_A(ctx, n2, n2, +g);
+  ctx_add_A(ctx, n1, n2, -g);
+  ctx_add_A(ctx, n2, n1, -g);
+}
+
+static void resistor_stamp_nonlinear(Device *d, StampContext *ctx, IterationState *it) {
+  // identical to DC for linear device
+  resistor_stamp_dc(d, ctx);
+}
+
+static void resistor_stamp_transient(Device *d, StampContext *ctx, TimeStepState *ts) {
+  // identical to DC for memoryless device
+  resistor_stamp_dc(d, ctx);
+}
+
+static void resistor_update_state(Device *d, double *x, TimeStepState *ts) {
+  // nothing to update; resistor is memoryless
+}
+
+static void resistor_free(Device *d) {
+  free(d->params);
+  free(d->state);
+  free(d);
+}
+
+static const DeviceVTable resistor_vt = {
+  .init = resistor_init,
+  .stamp_dc = resistor_stamp_dc,
+  .stamp_nonlinear = resistor_stamp_nonlinear,
+  .stamp_transient = resistor_stamp_transient,
+  .update_state = resistor_update_state,
+  .free = resistor_free,
+};
+```
+
+### Design benefits
+
+- **Separation of concerns:** Each device type concentrates its physics logic in one module; the simulator kernel remains generic and agnostic.
+- **Easy testing:** Device implementations can be unit-tested in isolation by creating a minimal circuit and calling their vtable methods directly.
+- **Flexible device types:** Linear, nonlinear, and reactive devices coexist; each provides only the stamping behavior it needs.
+- **Memory efficiency:** Devices store only the state they require (resistor state is empty; capacitor stores voltage history; etc.).
+
 **Device vtable (C-style)**
 
 ```c
