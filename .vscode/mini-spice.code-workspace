@@ -17,9 +17,6 @@
         "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/py/bin/python",
         "python.languageServer": "None",
         "ty.importStrategy": "useBundled",
-        "ty.interpreter": [
-            "${workspaceFolder}/.pixi/envs/py/bin/python"
-        ],
         "ty.disableLanguageServices": false,
         "ty.inlayHints.variableTypes": false,
         "editor.formatOnSave": true,
@@ -162,5 +159,6 @@
         },
         "cmake.configureOnEdit": false,
         "cmake.configureOnOpen": false,
+        "cmakeIntelliSence.cmakePath": "${workspaceFolder}/.pixi/envs/default/bin/cmake",
     }
 }
