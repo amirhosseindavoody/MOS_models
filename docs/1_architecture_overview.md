@@ -16,15 +16,15 @@ Mini-SPICE is an educational circuit simulator designed to perform DC and transi
                      │
 ┌────────────────────▼────────────────────────────────────┐
 │            Netlist Parser & Circuit Builder             │
-│  • Parse component definitions and connections         │
-│  • Build in-memory circuit representation              │
+│  • Parse component definitions and connections          │
+│  • Build in-memory circuit representation               │
 └────────────────────┬────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────┐
 │                  Circuit Representation                 │
-│  • Node list and indices                               │
-│  • Device list with connectivity                       │
-│  • Extra variable allocation (V-sources, inductors)    │
+│  • Node list and indices                                │
+│  • Device list with connectivity                        │
+│  • Extra variable allocation (V-sources, inductors)     │
 └────────────────────┬────────────────────────────────────┘
                      │
         ┌────────────┴────────────┬───────────────┐
