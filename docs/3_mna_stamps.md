@@ -108,19 +108,48 @@ In DC analysis, a capacitor is an open circuit. It has no effect on the MNA matr
 
 ### Transient Analysis
 
-For transient analysis, the capacitor is converted into a DC equivalent model at each time step `t_n`. Using the **Backward Euler** integration method, the model consists of a conductance `G_eq` in parallel with a current source `I_eq`.
+For transient analysis, the capacitor is converted into a DC equivalent model at each time step using the selected **integration method**. The model consists of a conductance `G_eq` in parallel with a current source `I_eq`.
 
--   **Equivalent Conductance**: `G_eq = C / h` (where `h` is the timestep)
--   **Equivalent Current**: `I_eq = (C / h) * (v_{n-1}(n1) - v_{n-1}(n2))` (where `v_{n-1}` is the voltage from the previous time step)
+#### General Formulation
 
-#### Derivation
+Using integration coefficients from the `IntegrationMethod` interface:
+
+-   **Equivalent Conductance**: `G_eq = α₀ · C / h`
+-   **History Current**: `I_eq = (α₁ · C / h) · v_{n-1} + (α₂ · C / h) · v_{n-2} + ...`
+
+For Trapezoidal rule, also include the previous current: `I_eq += i_{n-1}`
+
+#### Integration Method Coefficients for Capacitor
+
+| Method | α₀ | α₁ | α₂ | History includes i_{n-1}? |
+|--------|-----|-----|-----|---------------------------|
+| **Backward Euler** | 1 | 1 | 0 | No |
+| **Trapezoidal** | 2 | 2 | 0 | Yes |
+| **Gear (BDF2)** | 3/2 | 2 | -1/2 | No |
+
+#### Backward Euler (Default)
+
+-   **Equivalent Conductance**: `G_eq = C / h`
+-   **Equivalent Current**: `I_eq = (C / h) · (v_{n-1}(n1) - v_{n-1}(n2))`
+
+##### Derivation (Backward Euler)
 The capacitor's behavior is described by $i(t) = C \frac{dv(t)}{dt}$. Using the Backward Euler approximation for the derivative at time $t_n$:
 $$ \frac{dv(t_n)}{dt} \approx \frac{v(t_n) - v(t_{n-1})}{h} $$
 Substituting this into the capacitor equation gives the current at time $t_n$:
 $$ i_n = \frac{C}{h} (v_n - v_{n-1}) $$
 Letting $v_n$ be the voltage across the capacitor, $v_n = v_n(n1) - v_n(n2)$, we can rearrange the equation:
 $$ i_n = \underbrace{\left(\frac{C}{h}\right)}_{G_{eq}} (v_n(n1) - v_n(n2)) - \underbrace{\left(\frac{C}{h}\right)(v_{n-1}(n1) - v_{n-1}(n2))}_{I_{eq}} $$
-This equation shows that the capacitor at time $t_n$ is equivalent to a conductance $G_{eq}$ in parallel with a current source $I_{eq}$ that depends on the voltage from the previous time step.
+
+#### Trapezoidal Rule
+
+-   **Equivalent Conductance**: `G_eq = 2C / h`
+-   **Equivalent Current**: `I_eq = (2C / h) · v_{n-1} + i_{n-1}`
+
+##### Derivation (Trapezoidal)
+The trapezoidal rule uses:
+$$ i_n + i_{n-1} = \frac{2C}{h}(v_n - v_{n-1}) $$
+Rearranging:
+$$ i_n = \underbrace{\frac{2C}{h}}_{G_{eq}} v_n - \underbrace{\left(\frac{2C}{h} v_{n-1} + i_{n-1}\right)}_{I_{eq}} $$
 
 -   **MNA Stamp**:
 
@@ -160,25 +189,48 @@ A[k][n2] -= 1
 
 ### Transient Analysis
 
-Using the **Backward Euler** method, the inductor is modeled as a resistance `R_eq` in series with a voltage source `V_eq`. The MNA stamp is derived from the equation `v_n(n1) - v_n(n2) - (L/h) * i_L_n = -(L/h) * i_L_{n-1}`.
+Using the selected **integration method**, the inductor is modeled as a resistance `R_eq` in series with a voltage source `V_eq`.
+
+#### General Formulation
+
+Using integration coefficients from the `IntegrationMethod` interface:
+
+-   **Equivalent Resistance**: `R_eq = β₀ · L / h`
+-   **History Voltage**: `V_eq = (β₁ · L / h) · i_{L,n-1} + (β₂ · L / h) · i_{L,n-2}`
+
+For Trapezoidal rule, also include the previous voltage: `V_eq += v_{n-1}`
+
+#### Integration Method Coefficients for Inductor
+
+| Method | β₀ | β₁ | β₂ | History includes v_{n-1}? |
+|--------|-----|-----|-----|---------------------------|
+| **Backward Euler** | 1 | 1 | 0 | No |
+| **Trapezoidal** | 2 | 2 | 0 | Yes |
+| **Gear (BDF2)** | 3/2 | 2 | -1/2 | No |
+
+#### Backward Euler (Default)
 
 -   **Equivalent Resistance**: `R_eq = L / h`
--   **Equivalent Voltage Source**: `V_eq = (L / h) * i_L_{n-1}`
+-   **Equivalent Voltage Source**: `V_eq = (L / h) · i_L_{n-1}`
 
-#### Derivation
-The inductor's behavior is described by $v(t) = L \frac{di(t)}{dt}$. Using the Backward Euler approximation for the derivative at time $t_n$:
+##### Derivation (Backward Euler)
+The inductor's behavior is described by $v(t) = L \frac{di(t)}{dt}$. Using the Backward Euler approximation:
 $$
 \frac{di_L(t_n)}{dt} \approx \frac{i_L(t_n) - i_L(t_{n-1})}{h}
 $$
-Substituting this into the inductor equation gives the voltage at time $t_n$:
+Substituting:
 $$
 v_n = L \frac{i_{L,n} - i_{L,n-1}}{h}
 $$
-Letting $v_n = v_n(n1) - v_n(n2)$, we can rearrange the equation into the form needed for the MNA matrix:
+Rearranging into MNA form:
 $$
 v_n(n1) - v_n(n2) - \underbrace{\left(\frac{L}{h}\right)}_{R_{eq}} i_{L,n} = - \underbrace{\left(\frac{L}{h}\right) i_{L, n-1}}_{V_{eq}}
 $$
-This equation defines the new row added to the MNA system for the inductor's current.
+
+#### Trapezoidal Rule
+
+-   **Equivalent Resistance**: `R_eq = 2L / h`
+-   **Equivalent Voltage Source**: `V_eq = (2L / h) · i_{L,n-1} + v_{n-1}`
 
 -   **MNA Stamp**:
 
@@ -187,8 +239,8 @@ A[n1][k] += 1
 A[n2][k] -= 1
 A[k][n1] += 1
 A[k][n2] -= 1
-A[k][k]  -= L / h  // from R_eq
-z[k]     -= (L / h) * i_L_{n-1} // from V_eq
+A[k][k]  -= R_eq  // from equivalent resistance
+z[k]     -= V_eq  // from history voltage
 ```
 
 ## 6. Shockley Diode

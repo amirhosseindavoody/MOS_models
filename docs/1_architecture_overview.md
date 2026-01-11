@@ -149,15 +149,24 @@ The simulator kernel loops over all devices, calling the appropriate hook for th
 
 **Goal:** Compute circuit response over time using implicit time-stepping.
 
-**Numerical integration:** Backward Euler (simple) or Trapezoidal (more accurate)
-- Converts differential equations into algebraic constraints
-- Time discretization: $\frac{dv}{dt} \to \frac{v_n - v_{n-1}}{h}$
-- Reactive elements become equivalent resistors + history current sources
+**Numerical integration:** The simulator supports pluggable integration methods:
+
+| Method | Order | Stability | Accuracy | Use Case |
+|--------|-------|-----------|----------|----------|
+| **Backward Euler** | 1 | A-stable | O(h) | Default; simple, robust for stiff circuits |
+| **Trapezoidal** | 2 | A-stable | O(h²) | Higher accuracy; may ring with discontinuities |
+| **Gear (BDF2)** | 2 | A-stable | O(h²) | Good for stiff circuits; damped response |
+
+All methods convert differential equations into algebraic constraints by discretizing time:
+- General form: $\frac{dv}{dt} \to \alpha_0 \frac{v_n}{h} + \alpha_1 \frac{v_{n-1}}{h} + ...$
+- Reactive elements become equivalent conductances + history current sources
+- The `IntegrationMethod` interface provides coefficients for each method
 
 **Flow:**
-1. Initialize time step and previous state ($x_{n-1}$)
-2. **For each time step:**
-   - Set up time-step state: `TimeStepState = {t, h, x_prev}`
+1. Select integration method and initialize time step state
+2. Initialize previous state ($x_{n-1}$, and $x_{n-2}$ for multi-step methods)
+3. **For each time step:**
+   - Set up time-step state: `TimeStepState = {t, h, x_prev, integration_method}`
    - Initialize x guess (e.g., $x_{n-1}$)
    - **NR iteration loop** (nonlinear transient):
      - Reset `StampContext`
@@ -166,15 +175,16 @@ The simulator kernel loops over all devices, calling the appropriate hook for th
      - Solve for $\Delta x$; update x
      - Check convergence
    - When converged, for each device: call `update_state(x, ts)` to store history
-   - Advance time: $t \gets t + h$; $x_{n-1} \gets x_n$
+   - Advance time: $t \gets t + h$; shift history ($x_{n-2} \gets x_{n-1}$; $x_{n-1} \gets x_n$)
    - Output time-series point
 
 **Supported devices:** All DC devices + Capacitor, Inductor + nonlinear devices
 
 **Key differences from DC analysis:**
-- Reactive devices (capacitor, inductor) generate equivalent conductances and history currents based on time-step size
-- State must be updated after each successful time-step to store history (previous voltages, currents)
-- History terms couple the current step to previous steps via Backward Euler discretization
+- Reactive devices generate equivalent conductances and history currents based on time-step size and integration method
+- State must be updated after each successful time-step to store history
+- History terms couple the current step to previous steps via the selected integration method
+- Multi-step methods (Gear) require additional history storage
 
 ---
 
@@ -239,19 +249,59 @@ See [mna_stamps.md](mna_stamps.md) for all device stamps and [minimal_charge_bas
 
 See [stamp_api_design.md](stamp_api_design.md) for complete API semantics.
 
-### 4.4 Solvers
+### 4.4 Integration Methods
+
+The simulator uses a pluggable `IntegrationMethod` interface to support different time-discretization schemes:
+
+**Interface:**
+- `get_alpha0()`, `get_alpha1()`, ... — coefficients for capacitor discretization
+- `get_beta0()`, `get_beta1()`, ... — coefficients for inductor discretization  
+- `required_history_steps()` — number of previous solutions needed (1 for BE/Trap, 2 for Gear)
+
+**Supported methods:**
+
+| Method | Capacitor $G_{eq}$ | Capacitor $I_{eq}$ | Notes |
+|--------|-------------------|-------------------|-------|
+| Backward Euler | $C/h$ | $(C/h) \cdot v_{n-1}$ | Simple, robust |
+| Trapezoidal | $2C/h$ | $(2C/h) \cdot v_{n-1} + i_{n-1}$ | Higher accuracy |
+| Gear (BDF2) | $3C/(2h)$ | $(2C/h) \cdot v_{n-1} - (C/(2h)) \cdot v_{n-2}$ | Multi-step |
+
+Devices query the integration method via `TimeStepState` to obtain the appropriate coefficients.
+
+### 4.5 Solvers
 
 The simulator uses pluggable solver interfaces for flexibility:
 
-**Linear Solver:**
-- Direct: LAPACK (dense), CSR-based (sparse)
-- Input: Matrix $A$ (CSR), vector $z$
-- Output: Solution $x$
+**Linear Solver Types:**
+
+| Type | Backend Examples | Use Case |
+|------|------------------|----------|
+| **Direct Dense** | LAPACK (dgesv) | Small circuits (< 100 nodes) |
+| **Direct Sparse** | KLU, UMFPACK, SuperLU | Medium circuits (100-10k nodes) |
+| **Iterative** | GMRES, BiCGSTAB | Large circuits with good preconditioners |
+
+**Solver Interface:**
+```c
+typedef struct Solver Solver;
+struct Solver {
+    SolverType type;
+    int (*solve)(Solver *s, Matrix *A, double *rhs, double *x);
+    int (*factor)(Solver *s, Matrix *A);           // optional: for reusing factorization
+    int (*solve_factored)(Solver *s, double *rhs, double *x);  // solve with existing factor
+    void (*free)(Solver *s);
+};
+
+// Factory functions
+Solver *solver_create_dense();                     // LAPACK backend
+Solver *solver_create_sparse_direct();             // KLU/UMFPACK backend
+Solver *solver_create_iterative(double tol, int max_iter);  // GMRES/BiCGSTAB
+```
 
 **Nonlinear Solver (Newton–Raphson):**
 - Wrapper around linear solver
 - Manages iteration loop and convergence checking
 - Computes NR step: $\Delta x = A^{-1} \cdot (-F(x))$
+- Can reuse matrix factorization when Jacobian changes slowly
 
 ---
 
@@ -411,11 +461,11 @@ Each device contributes only local currents and derivatives. The global system i
 
 ## 9. Related Documentation
 
-- **[mna_stamps.md](mna_stamps.md)** — Detailed MNA matrix and RHS stamps for each device type
-- **[a_matrix_relationship.md](a_matrix_relationship.md)** — Mathematical relationship between device Jacobians and global MNA matrix
-- **[stamp_api_design.md](stamp_api_design.md)** — Complete C-style API for stamping, context, and vtable design
+- **[0_development_plan.md](0_development_plan.md)** — Project goals and development phases
+- **[2_stamp_api_design.md](2_stamp_api_design.md)** — Complete C-style API for stamping, context, and vtable design
+- **[3_mna_stamps.md](3_mna_stamps.md)** — Detailed MNA matrix and RHS stamps for each device type
+- **[4_a_matrix_relationship.md](4_a_matrix_relationship.md)** — Mathematical relationship between device Jacobians and global MNA matrix
 - **[minimal_charge_based_mosfet.md](minimal_charge_based_mosfet.md)** — Detailed MOSFET model equations and charge partitioning
-- **[development_plan.md](development_plan.md)** — Project goals and development phases
 
 ---
 
@@ -437,5 +487,5 @@ Each device contributes only local currents and derivatives. The global system i
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** December 2025  
-**Author:** Mini-SPICE Development Team
+**Last Updated:** January 2026  
+**Author:** Amirhossein Davoody

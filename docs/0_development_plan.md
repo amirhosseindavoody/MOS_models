@@ -84,18 +84,27 @@ The development can be broken down into the following phases:
     9.  Write comprehensive unit tests for all device stamps.
 
 -   **Phase 2: Transient Analysis**
-    1.  Implement the time-stepping loop with Backward Euler integration.
-    2.  Create transient models for Capacitor and Inductor using equivalent conductance + history RHS.
-    3.  Implement `update_state()` hook for reactive devices to store history (voltage/current).
-    4.  Integrate transient models with NR solver inside the time-stepping loop.
-    5.  Add support for time-varying sources (e.g., PWL, SIN, PULSE).
-    6.  Write tests for simple transient circuits (e.g., RC charging, RL, RLC oscillation).
+    1.  Implement the time-stepping loop with pluggable integration methods.
+    2.  Start with Backward Euler as the default integration method.
+    3.  Create transient models for Capacitor and Inductor using `IntegrationMethod` coefficients.
+    4.  Implement `update_state()` hook for reactive devices to store history (voltage/current).
+    5.  Integrate transient models with NR solver inside the time-stepping loop.
+    6.  Add support for time-varying sources (e.g., PWL, SIN, PULSE).
+    7.  Write tests for simple transient circuits (e.g., RC charging, RL, RLC oscillation).
 
--   **Phase 3: Advanced Models & Optimization**
+-   **Phase 3: Advanced Integration & Solvers**
+    1.  Implement Trapezoidal integration method (higher accuracy).
+    2.  Implement Gear (BDF2) integration method (better for stiff circuits).
+    3.  Add sparse direct solver backend (KLU/UMFPACK integration).
+    4.  Add iterative solver backend (GMRES/BiCGSTAB) with preconditioner support.
+    5.  Implement adaptive time-stepping based on LTE (local truncation error).
+    6.  Add solver selection heuristics based on circuit size and sparsity.
+
+-   **Phase 4: Advanced Models & Optimization**
     1.  Improve MOSFET model with charge-based formulation (see [minimal_charge_based_mosfet.md](minimal_charge_based_mosfet.md)).
     2.  Add diode junction capacitance for transient accuracy.
     3.  Improve netlist parser with .MODEL and .PARAM cards.
     4.  Optimize matrix assembly and solver for larger circuits.
-    2.  Enhance plotting and output capabilities.
-    3.  Implement more advanced device models.
-    4.  Performance optimizations.
+    5.  Enhance plotting and output capabilities.
+    6.  Implement more advanced device models.
+    7.  Performance optimizations.

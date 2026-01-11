@@ -273,17 +273,39 @@ void circuit_finalize(Circuit *c); // assigns node indices and extra vars
 
 **Solver interface**
 
+The simulator supports multiple linear solver backends:
+
 ```c
+typedef enum {
+    SOLVER_DIRECT_DENSE,    // LAPACK (dgesv) - for small circuits
+    SOLVER_DIRECT_SPARSE,   // KLU, UMFPACK, SuperLU - for medium circuits
+    SOLVER_ITERATIVE        // GMRES, BiCGSTAB - for large circuits
+} SolverType;
+
 typedef struct Solver Solver;
 struct Solver {
-  // assemble-ready matrix and rhs
+  SolverType type;
+  // Core solve: factor and solve in one call
   int (*solve)(Solver *s, Matrix *A, double *rhs, double *x); // returns 0 on success
+  
+  // Optional: separate factorization (for NR where Jacobian reuse is possible)
+  int (*factor)(Solver *s, Matrix *A);              // factor matrix A
+  int (*solve_factored)(Solver *s, double *rhs, double *x);  // solve with existing factor
+  
+  // Cleanup
   void (*free)(Solver *s);
 };
 
-Solver *solver_create_direct(); // small dense / LAPACK
-Solver *solver_create_sparse(); // CSR-based direct or iterative
+// Factory functions for different backends
+Solver *solver_create_dense();                              // LAPACK backend
+Solver *solver_create_sparse_direct();                      // KLU/UMFPACK backend  
+Solver *solver_create_iterative(double tol, int max_iter);  // GMRES/BiCGSTAB
 ```
+
+**Iterative solver notes:**
+- Iterative solvers require good preconditioners for circuit matrices
+- Common preconditioners: ILU(0), diagonal, block-diagonal
+- May fail to converge for ill-conditioned matrices; fall back to direct solver
 
 **Iteration & Time-step state**
 
@@ -298,8 +320,39 @@ struct IterationState {
 struct TimeStepState {
   double t;
   double h; // timestep
-  double *x_prev; // previous step solution
+  double *x_prev;   // previous step solution
+  double *x_prev2;  // second previous step (for multi-step methods like Gear)
+  const IntegrationMethod *im;  // current integration method
 };
+```
+
+**Integration Method Interface**
+
+The `IntegrationMethod` abstraction allows the simulator to support different time-discretization schemes. Devices query integration coefficients via this interface:
+
+```c
+typedef struct IntegrationMethod IntegrationMethod;
+struct IntegrationMethod {
+    const char *name;           // "backward_euler", "trapezoidal", "gear2"
+    int order;                  // 1 for BE, 2 for Trap/Gear2
+    
+    // Capacitor discretization: i = alpha0 * C/h * v_n - I_history
+    double alpha0;              // coefficient for current voltage
+    double alpha1;              // coefficient for v_{n-1}
+    double alpha2;              // coefficient for v_{n-2} (multi-step only)
+    
+    // Inductor discretization: v = beta0 * L/h * i_n - V_history
+    double beta0;               // coefficient for current current
+    double beta1;               // coefficient for i_{n-1}
+    double beta2;               // coefficient for i_{n-2} (multi-step only)
+    
+    int required_history;       // 1 for BE/Trap, 2 for Gear
+};
+
+// Predefined integration methods
+extern const IntegrationMethod BACKWARD_EULER;   // alpha0=1, alpha1=1
+extern const IntegrationMethod TRAPEZOIDAL;      // alpha0=2, alpha1=2 (+ current history)
+extern const IntegrationMethod GEAR2;            // alpha0=3/2, alpha1=2, alpha2=-1/2
 ```
 
 **Stamping examples (pseudocode)**
@@ -320,14 +373,17 @@ struct TimeStepState {
   - ctx_add_A(ctx,k,n1,+1); ctx_add_A(ctx,k,n2,-1);
   - ctx_add_z(ctx,k, V);
 
-- Capacitor (C between n1,n2) - transient Backward Euler:
-  - G_eq = C / h
-  - I_eq = G_eq * (v_prev(n1) - v_prev(n2))
+- Capacitor (C between n1,n2) - **using integration method**:
+  - Get coefficients from ts->im
+  - G_eq = ts->im->alpha0 * C / h
+  - I_eq = (ts->im->alpha1 * C / h) * v_prev + (ts->im->alpha2 * C / h) * v_prev2
+  - For Trapezoidal: also add i_prev to history term
   - stamp like resistor with G_eq and add RHS contributions using I_eq
 
-- Inductor (L between n1,n2) - uses extra var i_L:
-  - R_eq = L / h
-  - V_eq = R_eq * i_L_prev
+- Inductor (L between n1,n2) - **using integration method**:
+  - Get coefficients from ts->im
+  - R_eq = ts->im->beta0 * L / h
+  - V_eq = (ts->im->beta1 * L / h) * i_prev + (ts->im->beta2 * L / h) * i_prev2
   - stamp KCL/KVL rows and A[k][k] -= R_eq; z[k] -= V_eq
 
 - Diode (nonlinear) - NR iteration:
