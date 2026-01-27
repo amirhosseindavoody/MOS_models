@@ -44,5 +44,17 @@
             "jobs": 4,
             "cleanFirst": false
         }
+    ],
+    "testPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug Tests",
+            "configurePreset": "debug"
+        },
+        {
+            "name": "release",
+            "displayName": "Release Tests",
+            "configurePreset": "release"
+        }
     ]
 }
