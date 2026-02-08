@@ -17,14 +17,14 @@ add_executable(mini-spice main.cc)
 target_link_libraries(mini-spice minispice)
 
 # Unit tests
-add_executable(test_stamp test_stamp.cc)
-target_link_libraries(test_stamp minispice ${GTEST})
-gtest_discover_tests(test_stamp)
+add_executable(stamp_test stamp_test.cc)
+target_link_libraries(stamp_test minispice ${GTEST})
+gtest_discover_tests(stamp_test)
 
-add_executable(test_devices test_devices.cc)
-target_link_libraries(test_devices minispice ${GTEST})
-gtest_discover_tests(test_devices)
+add_executable(devices_test devices_test.cc)
+target_link_libraries(devices_test minispice ${GTEST})
+gtest_discover_tests(devices_test)
 
-add_executable(test_circuit test_circuit.cc)
-target_link_libraries(test_circuit minispice ${GTEST})
-gtest_discover_tests(test_circuit)
+add_executable(circuit_test circuit_test.cc)
+target_link_libraries(circuit_test minispice ${GTEST})
+gtest_discover_tests(circuit_test)
