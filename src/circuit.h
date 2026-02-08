@@ -41,6 +41,9 @@ int circuit_add_node(Circuit* c, const char* name);
 int circuit_get_node(Circuit* c, const char* name);
 int circuit_get_var_index(Circuit* c, int node_index);
 Device* circuit_add_device(Circuit* c, Device* d);
+
+// Finalize the circuit: assign variable indices and prepare for analysis
+// Returns 0 on success, -1 on error
 int circuit_finalize(Circuit* c);
 
 // PascalCase aliases for consumers expecting that style

@@ -84,7 +84,7 @@ where:
 - Devices contribute local derivatives (conductances, transconductances) to the global Jacobian
 - The MNA formulation is agnostic to device physics — each device type is responsible only for its local contribution
 
-See [mna_stamps.md](mna_stamps.md) and [a_matrix_relationship.md](a_matrix_relationship.md) for detailed mathematical formulations.
+See [3_mna_stamps.md](3_mna_stamps.md) and [4_a_matrix_relationship.md](4_a_matrix_relationship.md) for detailed mathematical formulations.
 
 ### 2.2 Device Stamping
 
@@ -97,19 +97,19 @@ This **delayed assembly** approach provides:
 - **Locality:** Each device only computes its local currents and sensitivities
 - **Efficiency:** Convert triplets to CSR/dense once per assembly, avoiding random writes
 
-See [stamp_api_design.md](stamp_api_design.md) for the complete API and vtable design.
+See [2_stamp_api_design.md](2_stamp_api_design.md) for the complete API and vtable design.
 
 ### 2.3 Device Polymorphism via Vtable
 
-Each device type implements a **virtual function table (vtable)** with six hooks:
+Each device type implements a **virtual function table (vtable)** with five hooks:
 
-| Hook | Purpose |
-|------|---------|
-| `init()` | One-time initialization; allocate extra variables |
-| `stamp_nonlinear()` | Jacobian and RHS for NR iterations (used for all DC analysis) |
-| `stamp_transient()` | Time-discretized stamping (reactive devices) |
-| `update_state()` | Store history after successful time-step |
-| `free()` | Cleanup and memory deallocation |
+| Hook             | Purpose                                                       |
+| ---------------- | ------------------------------------------------------------- |
+| `Init`           | One-time initialization; allocate extra variables             |
+| `StampNonlinear` | Jacobian and RHS for NR iterations (used for all DC analysis) |
+| `StampTransient` | Time-discretized stamping (reactive devices)                  |
+| `UpdateState`    | Store history after successful time-step                      |
+| `Free`           | Cleanup and memory deallocation                               |
 
 The simulator kernel loops over all devices, calling the appropriate hook for the current analysis mode. This allows new device types to be added without modifying the core simulator.
 
@@ -151,11 +151,11 @@ The simulator kernel loops over all devices, calling the appropriate hook for th
 
 **Numerical integration:** The simulator supports pluggable integration methods:
 
-| Method | Order | Stability | Accuracy | Use Case |
-|--------|-------|-----------|----------|----------|
-| **Backward Euler** | 1 | A-stable | O(h) | Default; simple, robust for stiff circuits |
-| **Trapezoidal** | 2 | A-stable | O(h²) | Higher accuracy; may ring with discontinuities |
-| **Gear (BDF2)** | 2 | A-stable | O(h²) | Good for stiff circuits; damped response |
+| Method             | Order | Stability | Accuracy | Use Case                                       |
+| ------------------ | ----- | --------- | -------- | ---------------------------------------------- |
+| **Backward Euler** | 1     | A-stable  | O(h)     | Default; simple, robust for stiff circuits     |
+| **Trapezoidal**    | 2     | A-stable  | O(h²)    | Higher accuracy; may ring with discontinuities |
+| **Gear (BDF2)**    | 2     | A-stable  | O(h²)    | Good for stiff circuits; damped response       |
 
 All methods convert differential equations into algebraic constraints by discretizing time:
 - General form: $\frac{dv}{dt} \to \alpha_0 \frac{v_n}{h} + \alpha_1 \frac{v_{n-1}}{h} + ...$
@@ -210,27 +210,27 @@ Each supported device type implements the vtable interface. Devices contribute t
 
 #### Linear DC Devices
 
-| Device | Stamp Type | MNA Contribution |
-|--------|----------|------------------|
-| **Resistor** | Conductance | $G = 1/R$ into 2×2 stamp |
+| Device                | Stamp Type                  | MNA Contribution                                 |
+| --------------------- | --------------------------- | ------------------------------------------------ |
+| **Resistor**          | Conductance                 | $G = 1/R$ into 2×2 stamp                         |
 | **DC Voltage Source** | Extra variable + constraint | Enforces $V_{n1} - V_{n2} = V$ via extra row/col |
-| **DC Current Source** | RHS | Adds $\pm I$ to z vector |
+| **DC Current Source** | RHS                         | Adds $\pm I$ to z vector                         |
 
 #### Nonlinear Devices
 
-| Device | Model | Jacobian | RHS |
-|--------|-------|----------|-----|
-| **Diode** | Shockley exponential | $g_{eq} = I_s \exp(V_d/(nV_t)) / (nV_t)$ | $I_{eq} = I_d - g_{eq} V_d$ |
+| Device     | Model                | Jacobian                                            | RHS                                            |
+| ---------- | -------------------- | --------------------------------------------------- | ---------------------------------------------- |
+| **Diode**  | Shockley exponential | $g_{eq} = I_s \exp(V_d/(nV_t)) / (nV_t)$            | $I_{eq} = I_d - g_{eq} V_d$                    |
 | **MOSFET** | Square-law (Level 1) | Transconductance $g_m$, output conductance $g_{ds}$ | $I_{eq} = I_{ds} - g_m V_{gs} - g_{ds} V_{ds}$ |
 
 See [mna_stamps.md](mna_stamps.md) for all device stamps and [minimal_charge_based_mosfet.md](minimal_charge_based_mosfet.md) for MOSFET charge model details.
 
 #### Reactive Devices (Transient)
 
-| Device | Equivalent Model (Backward Euler) | Effect |
-|--------|----------------------------------|--------|
-| **Capacitor** | Conductance $G_{eq} = C/h$ + history current | Stores voltage history |
-| **Inductor** | Resistance $R_{eq} = L/h$ + history voltage | Stores current history; requires extra variable |
+| Device        | Equivalent Model (Backward Euler)            | Effect                                          |
+| ------------- | -------------------------------------------- | ----------------------------------------------- |
+| **Capacitor** | Conductance $G_{eq} = C/h$ + history current | Stores voltage history                          |
+| **Inductor**  | Resistance $R_{eq} = L/h$ + history voltage  | Stores current history; requires extra variable |
 
 ### 4.3 StampContext & Assembly
 
@@ -260,11 +260,11 @@ The simulator uses a pluggable `IntegrationMethod` interface to support differen
 
 **Supported methods:**
 
-| Method | Capacitor $G_{eq}$ | Capacitor $I_{eq}$ | Notes |
-|--------|-------------------|-------------------|-------|
-| Backward Euler | $C/h$ | $(C/h) \cdot v_{n-1}$ | Simple, robust |
-| Trapezoidal | $2C/h$ | $(2C/h) \cdot v_{n-1} + i_{n-1}$ | Higher accuracy |
-| Gear (BDF2) | $3C/(2h)$ | $(2C/h) \cdot v_{n-1} - (C/(2h)) \cdot v_{n-2}$ | Multi-step |
+| Method         | Capacitor $G_{eq}$ | Capacitor $I_{eq}$                              | Notes           |
+| -------------- | ------------------ | ----------------------------------------------- | --------------- |
+| Backward Euler | $C/h$              | $(C/h) \cdot v_{n-1}$                           | Simple, robust  |
+| Trapezoidal    | $2C/h$             | $(2C/h) \cdot v_{n-1} + i_{n-1}$                | Higher accuracy |
+| Gear (BDF2)    | $3C/(2h)$          | $(2C/h) \cdot v_{n-1} - (C/(2h)) \cdot v_{n-2}$ | Multi-step      |
 
 Devices query the integration method via `TimeStepState` to obtain the appropriate coefficients.
 
@@ -274,11 +274,11 @@ The simulator uses pluggable solver interfaces for flexibility:
 
 **Linear Solver Types:**
 
-| Type | Backend Examples | Use Case |
-|------|------------------|----------|
-| **Direct Dense** | LAPACK (dgesv) | Small circuits (< 100 nodes) |
-| **Direct Sparse** | KLU, UMFPACK, SuperLU | Medium circuits (100-10k nodes) |
-| **Iterative** | GMRES, BiCGSTAB | Large circuits with good preconditioners |
+| Type              | Backend Examples      | Use Case                                 |
+| ----------------- | --------------------- | ---------------------------------------- |
+| **Direct Dense**  | LAPACK (dgesv)        | Small circuits (< 100 nodes)             |
+| **Direct Sparse** | KLU, UMFPACK, SuperLU | Medium circuits (100-10k nodes)          |
+| **Iterative**     | GMRES, BiCGSTAB       | Large circuits with good preconditioners |
 
 **Solver Interface:**
 ```c
@@ -292,17 +292,17 @@ struct Solver {
 };
 
 // Factory functions
-Solver *solver_create_dense();                     // LAPACK backend
+See [2_stamp_api_design.md](2_stamp_api_design.md) for the complete API and vtable design.
 Solver *solver_create_sparse_direct();             // KLU/UMFPACK backend
 Solver *solver_create_iterative(double tol, int max_iter);  // GMRES/BiCGSTAB
 ```
 
 **Nonlinear Solver (Newton–Raphson):**
-- Wrapper around linear solver
-- Manages iteration loop and convergence checking
-- Computes NR step: $\Delta x = A^{-1} \cdot (-F(x))$
-- Can reuse matrix factorization when Jacobian changes slowly
-
+ | `Init` | One-time initialization; allocate extra variables |
+ | `StampNonlinear` | Jacobian and RHS for NR iterations (used for all DC analysis) |
+ | `StampTransient` | Time-discretized stamping (reactive devices) |
+ | `UpdateState` | Store history after successful time-step |
+ | `Free` | Cleanup and memory deallocation |
 ---
 
 ## 5. Workflow Examples
@@ -471,18 +471,18 @@ Each device contributes only local currents and derivatives. The global system i
 
 ## 10. Glossary
 
-| Term | Definition |
-|------|-----------|
-| **MNA** | Modified Nodal Analysis; formulation of circuit equations as $A \cdot x = z$ |
-| **Stamp** | Contribution of a device to the MNA matrix and RHS |
-| **StampContext** | Arena for collecting triplets and RHS updates; assembly happens after all devices stamp |
-| **Triplet** | (row, col, value) tuple; accumulated and converted to CSR/dense format |
-| **Vtable** | Virtual function table; C-style polymorphism for device types |
-| **Jacobian** | Matrix of partial derivatives; for MNA, $J_{ij} = \partial I_i / \partial x_j$ |
-| **Backward Euler** | Implicit time-integration method; simple and stable for stiff systems |
-| **Newton–Raphson** | Iterative method to solve $F(x)=0$; requires Jacobian |
-| **Extra variable** | Additional unknown (e.g., inductor current, voltage source branch current) |
-| **Convergence** | NR iteration stops when $\||\Delta x\|| < \epsilon$; transient completes when both NR and time-stepping converge |
+| Term               | Definition                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **MNA**            | Modified Nodal Analysis; formulation of circuit equations as $A \cdot x = z$            |
+| **Stamp**          | Contribution of a device to the MNA matrix and RHS                                      |
+| **StampContext**   | Arena for collecting triplets and RHS updates; assembly happens after all devices stamp |
+| **Triplet**        | (row, col, value) tuple; accumulated and converted to CSR/dense format                  |
+| **Vtable**         | Virtual function table; C-style polymorphism for device types                           |
+| **Jacobian**       | Matrix of partial derivatives; for MNA, $J_{ij} = \partial I_i / \partial x_j$          |
+| **Backward Euler** | Implicit time-integration method; simple and stable for stiff systems                   |
+| **Newton–Raphson** | Iterative method to solve $F(x)=0$; requires Jacobian                                   |
+| **Extra variable** | Additional unknown (e.g., inductor current, voltage source branch current)              |
+| **Convergence**    | NR iteration stops when $\|                                                             | \Delta x\| | < \epsilon$; transient completes when both NR and time-stepping converge |
 
 ---
 

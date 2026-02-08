@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "device.h"
+
 namespace minispice {
 
 // ============================================================================
@@ -147,7 +149,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
       // For now, store node indices; var indices assigned after finalize
       // We'll use a different approach - store node indices and convert later
 
-      Device* d = create_resistor(name.c_str(), n1, n2, value);
+      Device* d = CreateResistor(name.c_str(), n1, n2, value);
       if (d) circuit_add_device(c, d);
 
     } else if (type == 'I') {
@@ -161,7 +163,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
       int n2 = circuit_add_node(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
-      Device* d = create_current_source(name.c_str(), n1, n2, value);
+      Device* d = CreateCurrentSource(name.c_str(), n1, n2, value);
       if (d) circuit_add_device(c, d);
 
     } else if (type == 'V') {
@@ -175,7 +177,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
       int n2 = circuit_add_node(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
-      Device* d = create_voltage_source(name.c_str(), n1, n2, value);
+      Device* d = CreateVoltageSource(name.c_str(), n1, n2, value);
       if (d) circuit_add_device(c, d);
 
     } else if (type == 'C') {
@@ -189,7 +191,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
       int n2 = circuit_add_node(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
-      Device* d = create_capacitor(name.c_str(), n1, n2, value);
+      Device* d = CreateCapacitor(name.c_str(), n1, n2, value);
       if (d) circuit_add_device(c, d);
 
     } else if (type == 'L') {
@@ -203,7 +205,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
       int n2 = circuit_add_node(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
-      Device* d = create_inductor(name.c_str(), n1, n2, value);
+      Device* d = CreateInductor(name.c_str(), n1, n2, value);
       if (d) circuit_add_device(c, d);
 
     } else if (type == 'D') {
@@ -229,7 +231,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
         }
       }
 
-      Device* d = create_diode(name.c_str(), n_anode, n_cathode, I_s, n);
+      Device* d = CreateDiode(name.c_str(), n_anode, n_cathode, I_s, n);
       if (d) circuit_add_device(c, d);
 
     } else {

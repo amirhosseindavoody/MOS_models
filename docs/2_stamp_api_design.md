@@ -7,7 +7,7 @@ This design document defines the C/C++ API and data structures for device stampi
 - Keep devices responsible for local calculations only; they push contributions into a StampContext.
 - Make stamping deterministic and easy to unit-test.
 
-**File:** [docs/stamp_api_design.md](docs/stamp_api_design.md)
+**File:** [2_stamp_api_design.md](2_stamp_api_design.md)
 
 **Key Concepts**
 - **Stamp:** device contributions to the MNA matrix `A` and RHS `z` for the current analysis step/iteration.
@@ -52,8 +52,11 @@ void ctx_add_z(StampContext *ctx, int idx, double val);
 // during initial circuit setup devices request extra variable indices
 int ctx_alloc_extra_var(StampContext *ctx);
 
-// convert triplets -> CSR or dense matrix for solver use
-Matrix *ctx_assemble_matrix(StampContext *ctx);
+// convert triplets -> dense matrix for solver use (see src/stamp.h)
+// In the implementation the helper exposed is:
+//   void ctx_assemble_dense(StampContext *ctx, double* matrix);
+// which assembles into a preallocated row-major dense matrix.
+void ctx_assemble_dense(StampContext *ctx, double* matrix);
 ```
 
 ## StampContext: role & semantics
@@ -106,55 +109,59 @@ The **vtable (virtual function table)** is a C-style mechanism for achieving **p
 
 ### The Device vtable interface
 
+Note: the canonical vtable as implemented in the headers uses PascalCase symbols. See `src/device.h`. The actual C++ header defines the vtable with these exact names and signatures:
+
 ```c
-typedef struct DeviceVTable {
-  void (*init)(Device *d, Circuit *c);
-  void (*stamp_dc)(Device *d, StampContext *ctx);
-  void (*stamp_nonlinear)(Device *d, StampContext *ctx, IterationState *it);
-  void (*stamp_transient)(Device *d, StampContext *ctx, TimeStepState *ts);
-  void (*update_state)(Device *d, double *x, TimeStepState *ts);
-  void (*free)(Device *d);
-} DeviceVTable;
+/* Device vtable as declared in src/device.h (exact symbol names) */
+struct DeviceVTable {
+  void (*Init)(Device* d, Circuit* c);
+  void (*StampNonlinear)(Device* d, StampContext* ctx, IterationState* it);
+  void (*StampTransient)(Device* d, StampContext* ctx, TimeStepState* ts);
+  void (*UpdateState)(Device* d, double* x, TimeStepState* ts);
+  void (*Free)(Device* d);
+};
 
 struct Device {
-  const DeviceVTable *vt;
-  int nodes[4]; // generic terminal indices: use -1 for unused terminals
-  void *params; // device-specific parameters (e.g., resistor value, diode Is)
-  void *state;  // device-specific state (history, prev voltages, prev currents)
-  int extra_var; // index of extra variable if allocated (for voltage sources, inductors)
+  const DeviceVTable* vt;
+  int nodes[4];
+  void* params;
+  void* state;
+  int extra_var;
 };
 ```
+
+This document retains the C-style helper names in examples (e.g., `ctx_add_A`, `ctx_add_z`), but the device vtable symbols in the implementation are PascalCase (as above).
 
 ### Vtable methods explained
 
 Each function pointer in the vtable defines a lifecycle hook:
 
-- **`init(Device *d, Circuit *c)`**
+- **`Init(Device *d, Circuit *c)`**
   - Called once after the device is added to the circuit but before any analysis begins.
   - Allows the device to initialize internal state, validate parameters, and allocate extra variables if needed (e.g., voltage source branch current, inductor current).
   - Example: a voltage source calls `ctx_alloc_extra_var()` to obtain its extra variable index for the branch current.
 
-- **`stamp_dc(Device *d, StampContext *ctx)`**
-  - Called during each DC linear analysis to push the device's contributions to the MNA matrix and RHS.
-  - Used for linear devices (resistor, linear current/voltage sources) or DC biasing of nonlinear devices.
+- **`StampNonlinear(Device *d, StampContext *ctx)`**
+  - Called during DC analysis to push the device's contributions to the MNA matrix and RHS. For nonlinear devices this is used inside Newton–Raphson iterations.
+  - Used for linear devices (resistor, linear current/voltage sources) and for DC biasing of nonlinear devices.
   - Example: a resistor with value R and nodes n1, n2 stamps the conductance 1/R into the matrix.
 
-- **`stamp_nonlinear(Device *d, StampContext *ctx, IterationState *it)`**
+- **`StampNonlinear(Device *d, StampContext *ctx, IterationState *it)`**
   - Called during each Newton–Raphson iteration of a DC nonlinear analysis or transient solve.
   - Allows the device to compute its operating point for the current guess vector (stored in `it->x_current`) and stamp the Jacobian (linearized conductance) and nonlinear RHS contribution.
   - Example: a diode computes its exponential current and small-signal conductance around the current voltage estimate.
 
-- **`stamp_transient(Device *d, StampContext *ctx, TimeStepState *ts)`**
+- **`StampTransient(Device *d, StampContext *ctx, TimeStepState *ts)`**
   - Called during each transient time-step to stamp contributions that include time-derivative or history terms.
   - Used for reactive devices (capacitors, inductors) and implicit time-stepping schemes (Backward Euler, trapezoidal).
   - Example: a capacitor stamps an equivalent conductance and current source based on the previous step's voltage and the time-step size.
 
-- **`update_state(Device *d, double *x, TimeStepState *ts)`**
+- **`UpdateState(Device *d, double *x, TimeStepState *ts)`**
   - Called after a successful transient time-step solution to allow the device to update its internal state with the new solution vector `x`.
   - Used to store history needed for the next time-step (previous voltages, currents, flux linkages).
   - Example: a capacitor stores `v_prev = x[n1] - x[n2]` for the next step; an inductor stores `i_prev`.
 
-- **`free(Device *d)`**
+- **`Free(Device *d)`**
   - Called when the device is destroyed (circuit cleanup) to deallocate any device-specific memory (params, state).
 
 ### Calling convention in the simulator kernel
@@ -162,19 +169,19 @@ Each function pointer in the vtable defines a lifecycle hook:
 The simulator kernel typically loops over all devices and calls the appropriate vtable method:
 
 ```c
-// DC linear analysis
+// DC analysis (linear or NR)
 for (Device *d = circuit->devices; d != NULL; d = d->next) {
-    d->vt->stamp_dc(d, ctx);
+    d->vt->StampNonlinear(d, ctx);
 }
 
 // NR iteration during transient
 for (Device *d = circuit->devices; d != NULL; d = d->next) {
-    d->vt->stamp_nonlinear(d, ctx, iteration_state);
+    d->vt->StampNonlinear(d, ctx, iteration_state);
 }
 
 // After converged transient step
 for (Device *d = circuit->devices; d != NULL; d = d->next) {
-    d->vt->update_state(d, x, time_step_state);
+    d->vt->UpdateState(d, x, time_step_state);
 }
 ```
 
@@ -405,7 +412,7 @@ extern const IntegrationMethod GEAR2;            // alpha0=3/2, alpha1=2, alpha2
   1. initialize x (e.g., zeros)
   2. loop until converge:
      - ctx_reset
-     - for each device: stamp_nonlinear(device, ctx, it)
+    - for each device: StampNonlinear(device, ctx, it)
      - assemble A, z (Jacobian and residual RHS)
      - solve for delta_x (A * delta_x = -F)
      - update x

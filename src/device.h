@@ -36,7 +36,11 @@ struct Device {
   void* params;            // Device-specific parameters
   void* state;             // Device-specific state (history, etc.)
   int extra_var;           // Extra variable index (for V-sources, L)
-  Device* next;            // Next device in circuit's linked list
+                  // Note: extra_var is -1 if not used, or the index of the
+                  // extra variable in the MNA system if used
+                  // extra_var is set to -2 during initialization to request
+                  // allocation of an extra variable by circuit_finalize
+  Device* next;  // Next device in circuit's linked list
 };
 
 // ============================================================================
@@ -68,35 +72,6 @@ Device* CreateDiode(const char* name, int n_anode, int n_cathode, double I_s,
 
 // Free a device and its associated memory
 void DeviceFree(Device* d);
-
-// ----------------------------------------------------------------------------
-// C-style aliases (snake_case) to match tests/docs
-// ----------------------------------------------------------------------------
-inline Device* create_resistor(const char* name, int n1, int n2,
-                               double resistance) {
-  return CreateResistor(name, n1, n2, resistance);
-}
-inline Device* create_current_source(const char* name, int n1, int n2,
-                                     double current) {
-  return CreateCurrentSource(name, n1, n2, current);
-}
-inline Device* create_voltage_source(const char* name, int n1, int n2,
-                                     double voltage) {
-  return CreateVoltageSource(name, n1, n2, voltage);
-}
-inline Device* create_capacitor(const char* name, int n1, int n2,
-                                double capacitance) {
-  return CreateCapacitor(name, n1, n2, capacitance);
-}
-inline Device* create_inductor(const char* name, int n1, int n2,
-                               double inductance) {
-  return CreateInductor(name, n1, n2, inductance);
-}
-inline Device* create_diode(const char* name, int n_anode, int n_cathode,
-                            double I_s, double n) {
-  return CreateDiode(name, n_anode, n_cathode, I_s, n);
-}
-inline void device_free(Device* d) { DeviceFree(d); }
 
 }  // namespace minispice
 

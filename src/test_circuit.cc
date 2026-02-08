@@ -71,7 +71,7 @@ TEST_F(CircuitTest, AddDevices) {
   int n1 = circuit_add_node(c, "1");
   int n2 = circuit_add_node(c, "2");
 
-  Device* r = create_resistor("R1", n1, n2, 1000.0);
+  Device* r = CreateResistor("R1", n1, n2, 1000.0);
   Device* added = circuit_add_device(c, r);
 
   EXPECT_EQ(added, r);
@@ -82,7 +82,7 @@ TEST_F(CircuitTest, Finalization) {
   int n1 = circuit_add_node(c, "1");
   int n2 = circuit_add_node(c, "2");
 
-  Device* r = create_resistor("R1", n1, n2, 1000.0);
+  Device* r = CreateResistor("R1", n1, n2, 1000.0);
   circuit_add_device(c, r);
 
   int result = circuit_finalize(c);
@@ -94,8 +94,7 @@ TEST_F(CircuitTest, Finalization) {
 TEST_F(CircuitTest, VoltageSourceExtraVar) {
   int n1 = circuit_add_node(c, "1");
 
-  Device* v =
-      create_voltage_source("V1", n1, 0, 5.0);  // 0 is ground node index
+  Device* v = CreateVoltageSource("V1", n1, 0, 5.0);  // 0 is ground node index
   circuit_add_device(c, v);
 
   circuit_finalize(c);
@@ -117,9 +116,9 @@ TEST_F(CircuitTest, SimpleVoltageDivider) {
   int n_vpos = circuit_add_node(c, "vpos");  // positive terminal of V1
 
   // Note: device nodes are node indices, will be converted to var indices
-  Device* v1 = create_voltage_source("V1", n_vpos, 0, 5.0);
-  Device* r1 = create_resistor("R1", n_vpos, n1, 1000.0);
-  Device* r2 = create_resistor("R2", n1, 0, 1000.0);
+  Device* v1 = CreateVoltageSource("V1", n_vpos, 0, 5.0);
+  Device* r1 = CreateResistor("R1", n_vpos, n1, 1000.0);
+  Device* r2 = CreateResistor("R2", n1, 0, 1000.0);
 
   circuit_add_device(c, v1);
   circuit_add_device(c, r1);
@@ -157,8 +156,8 @@ TEST_F(CircuitTest, CurrentSourceWithResistor) {
 
   int n1 = circuit_add_node(c, "1");
 
-  Device* i1 = create_current_source("I1", 0, n1, 0.001);  // Current into n1
-  Device* r1 = create_resistor("R1", n1, 0, 1000.0);
+  Device* i1 = CreateCurrentSource("I1", 0, n1, 0.001);  // Current into n1
+  Device* r1 = CreateResistor("R1", n1, 0, 1000.0);
 
   circuit_add_device(c, i1);
   circuit_add_device(c, r1);

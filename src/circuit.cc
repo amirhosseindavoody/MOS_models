@@ -20,7 +20,7 @@ namespace {
 // Internal Utilities
 // =============================================================================
 
-static bool is_ground_name(const char* name) {
+static bool IsGroundName(const char* name) {
   if (!name) return false;
   if (strcmp(name, "0") == 0) return true;
   if (strcasecmp(name, "gnd") == 0) return true;
@@ -150,11 +150,17 @@ void circuit_free(Circuit* c) {
 }
 
 int circuit_add_node(Circuit* c, const char* name) {
-  if (!c || !name) return -1;
-  if (c->finalized) return -1;  // Cannot add nodes after finalization
+  if (c == nullptr || name == nullptr) {
+    return -1;
+  }
+
+  // Cannot add nodes after finalization
+  if (c->finalized) {
+    return -1;
+  }
 
   // Check for ground
-  if (is_ground_name(name)) {
+  if (IsGroundName(name)) {
     return 0;  // Ground is always index 0
   }
 
@@ -187,7 +193,7 @@ int circuit_add_node(Circuit* c, const char* name) {
 int circuit_get_node(Circuit* c, const char* name) {
   if (!c || !name) return -1;
 
-  if (is_ground_name(name)) {
+  if (IsGroundName(name)) {
     return 0;
   }
 

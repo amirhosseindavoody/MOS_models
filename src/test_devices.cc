@@ -33,17 +33,17 @@ class DeviceTest : public ::testing::Test {
 // ============================================================================
 
 TEST_F(DeviceTest, ResistorCreation) {
-  Device* r = create_resistor("R1", 0, 1, 1000.0);
+  Device* r = CreateResistor("R1", 0, 1, 1000.0);
   ASSERT_NE(r, nullptr);
   EXPECT_STREQ(r->name, "R1");
   EXPECT_EQ(r->nodes[0], 0);
   EXPECT_EQ(r->nodes[1], 1);
   EXPECT_EQ(r->extra_var, -1);
-  device_free(r);
+  DeviceFree(r);
 }
 
 TEST_F(DeviceTest, ResistorStamp) {
-  Device* r = create_resistor("R1", 0, 1, 1000.0);
+  Device* r = CreateResistor("R1", 0, 1, 1000.0);
   ASSERT_NE(r, nullptr);
 
   IterationState it = {0, nullptr, 1e-9, 1e-6};
@@ -59,12 +59,12 @@ TEST_F(DeviceTest, ResistorStamp) {
   EXPECT_DOUBLE_EQ(matrix[0 * 4 + 1], -g);  // A[0][1] = -g
   EXPECT_DOUBLE_EQ(matrix[1 * 4 + 0], -g);  // A[1][0] = -g
 
-  device_free(r);
+  DeviceFree(r);
 }
 
 TEST_F(DeviceTest, ResistorWithGroundNode) {
   // Node -1 represents ground (excluded from stamping)
-  Device* r = create_resistor("R1", 0, -1, 1000.0);
+  Device* r = CreateResistor("R1", 0, -1, 1000.0);
   ASSERT_NE(r, nullptr);
 
   IterationState it = {0, nullptr, 1e-9, 1e-6};
@@ -79,7 +79,7 @@ TEST_F(DeviceTest, ResistorWithGroundNode) {
   EXPECT_DOUBLE_EQ(matrix[0 * 4 + 1], 0.0);
   EXPECT_DOUBLE_EQ(matrix[1 * 4 + 0], 0.0);
 
-  device_free(r);
+  DeviceFree(r);
 }
 
 // ============================================================================
@@ -87,14 +87,14 @@ TEST_F(DeviceTest, ResistorWithGroundNode) {
 // ============================================================================
 
 TEST_F(DeviceTest, CurrentSourceCreation) {
-  Device* i = create_current_source("I1", 0, 1, 0.001);
+  Device* i = CreateCurrentSource("I1", 0, 1, 0.001);
   ASSERT_NE(i, nullptr);
   EXPECT_STREQ(i->name, "I1");
-  device_free(i);
+  DeviceFree(i);
 }
 
 TEST_F(DeviceTest, CurrentSourceStamp) {
-  Device* i = create_current_source("I1", 0, 1, 0.001);
+  Device* i = CreateCurrentSource("I1", 0, 1, 0.001);
   ASSERT_NE(i, nullptr);
 
   IterationState it = {0, nullptr, 1e-9, 1e-6};
@@ -109,7 +109,7 @@ TEST_F(DeviceTest, CurrentSourceStamp) {
   EXPECT_DOUBLE_EQ(z[0], -0.001);  // z[n1] -= I
   EXPECT_DOUBLE_EQ(z[1], +0.001);  // z[n2] += I
 
-  device_free(i);
+  DeviceFree(i);
 }
 
 // ============================================================================
@@ -117,22 +117,22 @@ TEST_F(DeviceTest, CurrentSourceStamp) {
 // ============================================================================
 
 TEST_F(DeviceTest, VoltageSourceCreation) {
-  Device* v = create_voltage_source("V1", 0, 1, 5.0);
+  Device* v = CreateVoltageSource("V1", 0, 1, 5.0);
   ASSERT_NE(v, nullptr);
   EXPECT_STREQ(v->name, "V1");
   EXPECT_EQ(v->extra_var, -1);  // Will be set after init
-  device_free(v);
+  DeviceFree(v);
 }
 
 TEST_F(DeviceTest, VoltageSourceInit) {
-  Device* v = create_voltage_source("V1", 0, 1, 5.0);
+  Device* v = CreateVoltageSource("V1", 0, 1, 5.0);
   ASSERT_NE(v, nullptr);
 
   // Init should request extra variable
   v->vt->Init(v, nullptr);
   EXPECT_EQ(v->extra_var, -2);  // Marker for needs allocation
 
-  device_free(v);
+  DeviceFree(v);
 }
 
 TEST_F(DeviceTest, VoltageSourceStamp) {
@@ -140,7 +140,7 @@ TEST_F(DeviceTest, VoltageSourceStamp) {
   ctx_free(ctx);
   ctx = ctx_create(3);
 
-  Device* v = create_voltage_source("V1", 0, 1, 5.0);
+  Device* v = CreateVoltageSource("V1", 0, 1, 5.0);
   ASSERT_NE(v, nullptr);
 
   // Simulate finalization: allocate extra var
@@ -163,7 +163,7 @@ TEST_F(DeviceTest, VoltageSourceStamp) {
   double* z = ctx_get_z(ctx);
   EXPECT_DOUBLE_EQ(z[2], 5.0);  // z[k] = V
 
-  device_free(v);
+  DeviceFree(v);
 }
 
 // ============================================================================
@@ -171,7 +171,7 @@ TEST_F(DeviceTest, VoltageSourceStamp) {
 // ============================================================================
 
 TEST_F(DeviceTest, CapacitorDCStamp) {
-  Device* c = create_capacitor("C1", 0, 1, 1e-6);
+  Device* c = CreateCapacitor("C1", 0, 1, 1e-6);
   ASSERT_NE(c, nullptr);
 
   // Init to allocate state
@@ -185,7 +185,7 @@ TEST_F(DeviceTest, CapacitorDCStamp) {
   ctx_get_triplets(ctx, &count);
   EXPECT_EQ(count, 0u);
 
-  device_free(c);
+  DeviceFree(c);
 }
 
 // ============================================================================
@@ -197,7 +197,7 @@ TEST_F(DeviceTest, InductorDCStamp) {
   ctx_free(ctx);
   ctx = ctx_create(3);
 
-  Device* l = create_inductor("L1", 0, 1, 1e-3);
+  Device* l = CreateInductor("L1", 0, 1, 1e-3);
   ASSERT_NE(l, nullptr);
 
   // Simulate finalization
@@ -216,7 +216,7 @@ TEST_F(DeviceTest, InductorDCStamp) {
   EXPECT_DOUBLE_EQ(matrix[2 * 3 + 0], 1.0);   // A[k][0]
   EXPECT_DOUBLE_EQ(matrix[2 * 3 + 1], -1.0);  // A[k][1]
 
-  device_free(l);
+  DeviceFree(l);
 }
 
 // ============================================================================
@@ -224,14 +224,14 @@ TEST_F(DeviceTest, InductorDCStamp) {
 // ============================================================================
 
 TEST_F(DeviceTest, DiodeCreation) {
-  Device* d = create_diode("D1", 0, 1, 1e-14, 1.0);
+  Device* d = CreateDiode("D1", 0, 1, 1e-14, 1.0);
   ASSERT_NE(d, nullptr);
   EXPECT_STREQ(d->name, "D1");
-  device_free(d);
+  DeviceFree(d);
 }
 
 TEST_F(DeviceTest, DiodeStampAtZeroBias) {
-  Device* d = create_diode("D1", 0, 1, 1e-14, 1.0);
+  Device* d = CreateDiode("D1", 0, 1, 1e-14, 1.0);
   ASSERT_NE(d, nullptr);
 
   double x[4] = {0.0, 0.0, 0.0, 0.0};  // Zero bias
@@ -246,11 +246,11 @@ TEST_F(DeviceTest, DiodeStampAtZeroBias) {
   EXPECT_GT(matrix[0 * 4 + 0], 0.0);
   EXPECT_LT(matrix[0 * 4 + 0], 1e-9);  // Very small conductance at zero bias
 
-  device_free(d);
+  DeviceFree(d);
 }
 
 TEST_F(DeviceTest, DiodeStampForwardBias) {
-  Device* d = create_diode("D1", 0, 1, 1e-14, 1.0);
+  Device* d = CreateDiode("D1", 0, 1, 1e-14, 1.0);
   ASSERT_NE(d, nullptr);
 
   double x[4] = {0.6, 0.0, 0.0, 0.0};  // Forward bias ~0.6V
@@ -269,5 +269,5 @@ TEST_F(DeviceTest, DiodeStampForwardBias) {
   EXPECT_DOUBLE_EQ(matrix[0 * 4 + 1], matrix[1 * 4 + 0]);
   EXPECT_DOUBLE_EQ(matrix[0 * 4 + 1], -g);
 
-  device_free(d);
+  DeviceFree(d);
 }
