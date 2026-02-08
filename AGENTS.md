@@ -31,6 +31,8 @@ This document provides instructions for AI coding assistants helping with the de
 ### Code Style
 
 1. **Google C++ Style**: Follow the Google C++ Style Guide for code style.
+   1. **PascalCase for Functions and Types**: Use PascalCase for function and type names (e.g., `CircuitFinalize`, `DeviceVTable`).
+   2. **snake_case for Variables**: Use snake_case for variable names (e.g.,
 2. **Consistent Naming**: Use descriptive and consistent naming conventions for variables, functions, and classes.
 3. **Documentation**: Document the code with clear and concise comments and documentation.
 4. **Testing**: Write unit tests for the code to ensure it works as expected.
@@ -90,14 +92,14 @@ cmake --build build
 
 Refer to these documents for detailed specifications:
 
-| Document | Purpose |
-|----------|---------|
-| `docs/0_development_plan.md` | Project goals and roadmap |
-| `docs/1_architecture_overview.md` | High-level system design |
-| `docs/2_stamp_api_design.md` | C API specification |
-| `docs/3_mna_stamps.md` | Device stamp formulas |
-| `docs/4_a_matrix_relationship.md` | Jacobian mathematics |
-| `docs/minimal_charge_based_mosfet.md` | MOSFET model details |
+| Document                              | Purpose                   |
+| ------------------------------------- | ------------------------- |
+| `docs/0_development_plan.md`          | Project goals and roadmap |
+| `docs/1_architecture_overview.md`     | High-level system design  |
+| `docs/2_stamp_api_design.md`          | C API specification       |
+| `docs/3_mna_stamps.md`                | Device stamp formulas     |
+| `docs/4_a_matrix_relationship.md`     | Jacobian mathematics      |
+| `docs/minimal_charge_based_mosfet.md` | MOSFET model details      |
 
 ---
 

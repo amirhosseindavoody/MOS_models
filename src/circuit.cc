@@ -149,7 +149,7 @@ void circuit_free(Circuit* c) {
   free(c);
 }
 
-int circuit_add_node(Circuit* c, const char* name) {
+int CircuitAddNode(Circuit* c, const char* name) {
   if (c == nullptr || name == nullptr) {
     return -1;
   }
@@ -190,7 +190,7 @@ int circuit_add_node(Circuit* c, const char* name) {
   return idx;
 }
 
-int circuit_get_node(Circuit* c, const char* name) {
+int CircuitGetNode(Circuit* c, const char* name) {
   if (!c || !name) return -1;
 
   if (IsGroundName(name)) {
@@ -206,14 +206,14 @@ int circuit_get_node(Circuit* c, const char* name) {
   return -1;
 }
 
-int circuit_get_var_index(Circuit* c, int node_index) {
+int CircuitGetVarIndex(Circuit* c, int node_index) {
   if (!c) return -1;
   if (node_index < 0 || node_index >= c->num_nodes) return -1;
 
   return c->nodes[node_index].var_index;
 }
 
-Device* circuit_add_device(Circuit* c, Device* d) {
+Device* CircuitAddDevice(Circuit* c, Device* d) {
   if (!c || !d) return nullptr;
   if (c->finalized) return nullptr;
 
@@ -225,7 +225,7 @@ Device* circuit_add_device(Circuit* c, Device* d) {
   return d;
 }
 
-int circuit_finalize(Circuit* c) {
+int CircuitFinalize(Circuit* c) {
   if (!c) return -1;
   if (c->finalized) return 0;  // Already finalized
 
@@ -278,8 +278,8 @@ int circuit_finalize(Circuit* c) {
   return 0;
 }
 
-int circuit_dc_analysis(Circuit* c, double* x, int max_iter, double tol_abs,
-                        double tol_rel) {
+int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
+                      double tol_rel) {
   if (!c || !x) return -1;
   if (!c->finalized) return -1;
 
@@ -388,7 +388,7 @@ int circuit_dc_analysis(Circuit* c, double* x, int max_iter, double tol_abs,
   return iter;
 }
 
-void circuit_print_summary(Circuit* c) {
+void CircuitPrintSummary(Circuit* c) {
   if (!c) return;
 
   printf("Circuit Summary:\n");
@@ -399,7 +399,7 @@ void circuit_print_summary(Circuit* c) {
   printf("  Finalized: %s\n", c->finalized ? "yes" : "no");
 }
 
-void circuit_print_solution(Circuit* c, double* x) {
+void CircuitPrintSolution(Circuit* c, double* x) {
   if (!c || !x) return;
   if (!c->finalized) return;
 

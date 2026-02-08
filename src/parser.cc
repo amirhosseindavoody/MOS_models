@@ -140,17 +140,17 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
                 line.c_str());
         continue;
       }
-      int n1 = circuit_add_node(c, tokens[1].c_str());
-      int n2 = circuit_add_node(c, tokens[2].c_str());
+      int n1 = CircuitAddNode(c, tokens[1].c_str());
+      int n2 = CircuitAddNode(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
-      int v1 = circuit_get_var_index(c, n1);
-      int v2 = circuit_get_var_index(c, n2);
+      int v1 = CircuitGetVarIndex(c, n1);
+      int v2 = CircuitGetVarIndex(c, n2);
       // For now, store node indices; var indices assigned after finalize
       // We'll use a different approach - store node indices and convert later
 
       Device* d = CreateResistor(name.c_str(), n1, n2, value);
-      if (d) circuit_add_device(c, d);
+      if (d) CircuitAddDevice(c, d);
 
     } else if (type == 'I') {
       // Current Source: Iname n1 n2 value
@@ -159,12 +159,12 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
                 line.c_str());
         continue;
       }
-      int n1 = circuit_add_node(c, tokens[1].c_str());
-      int n2 = circuit_add_node(c, tokens[2].c_str());
+      int n1 = CircuitAddNode(c, tokens[1].c_str());
+      int n2 = CircuitAddNode(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
       Device* d = CreateCurrentSource(name.c_str(), n1, n2, value);
-      if (d) circuit_add_device(c, d);
+      if (d) CircuitAddDevice(c, d);
 
     } else if (type == 'V') {
       // Voltage Source: Vname n1 n2 value
@@ -173,12 +173,12 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
                 line.c_str());
         continue;
       }
-      int n1 = circuit_add_node(c, tokens[1].c_str());
-      int n2 = circuit_add_node(c, tokens[2].c_str());
+      int n1 = CircuitAddNode(c, tokens[1].c_str());
+      int n2 = CircuitAddNode(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
       Device* d = CreateVoltageSource(name.c_str(), n1, n2, value);
-      if (d) circuit_add_device(c, d);
+      if (d) CircuitAddDevice(c, d);
 
     } else if (type == 'C') {
       // Capacitor: Cname n1 n2 value
@@ -187,12 +187,12 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
                 line.c_str());
         continue;
       }
-      int n1 = circuit_add_node(c, tokens[1].c_str());
-      int n2 = circuit_add_node(c, tokens[2].c_str());
+      int n1 = CircuitAddNode(c, tokens[1].c_str());
+      int n2 = CircuitAddNode(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
       Device* d = CreateCapacitor(name.c_str(), n1, n2, value);
-      if (d) circuit_add_device(c, d);
+      if (d) CircuitAddDevice(c, d);
 
     } else if (type == 'L') {
       // Inductor: Lname n1 n2 value
@@ -201,12 +201,12 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
                 line.c_str());
         continue;
       }
-      int n1 = circuit_add_node(c, tokens[1].c_str());
-      int n2 = circuit_add_node(c, tokens[2].c_str());
+      int n1 = CircuitAddNode(c, tokens[1].c_str());
+      int n2 = CircuitAddNode(c, tokens[2].c_str());
       double value = parse_value(tokens[3]);
 
       Device* d = CreateInductor(name.c_str(), n1, n2, value);
-      if (d) circuit_add_device(c, d);
+      if (d) CircuitAddDevice(c, d);
 
     } else if (type == 'D') {
       // Diode: Dname anode cathode [Is=value] [n=value]
@@ -214,8 +214,8 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
         fprintf(stderr, "Parser error: Invalid diode line: %s\n", line.c_str());
         continue;
       }
-      int n_anode = circuit_add_node(c, tokens[1].c_str());
-      int n_cathode = circuit_add_node(c, tokens[2].c_str());
+      int n_anode = CircuitAddNode(c, tokens[1].c_str());
+      int n_cathode = CircuitAddNode(c, tokens[2].c_str());
 
       // Default diode parameters
       double I_s = 1e-14;
@@ -232,7 +232,7 @@ static Circuit* parse_lines(const std::vector<std::string>& lines) {
       }
 
       Device* d = CreateDiode(name.c_str(), n_anode, n_cathode, I_s, n);
-      if (d) circuit_add_device(c, d);
+      if (d) CircuitAddDevice(c, d);
 
     } else {
       // Unknown element type - skip
@@ -274,7 +274,7 @@ Circuit* parse_netlist_file(const char* filepath) {
 
   // Finalize: assigns var indices and initializes devices
   // But first, we need to fix up device node indices to var indices
-  if (circuit_finalize(c) != 0) {
+  if (CircuitFinalize(c) != 0) {
     circuit_free(c);
     return nullptr;
   }
@@ -305,7 +305,7 @@ Circuit* parse_netlist_string(const char* netlist) {
   Circuit* c = parse_lines(lines);
   if (!c) return nullptr;
 
-  if (circuit_finalize(c) != 0) {
+  if (CircuitFinalize(c) != 0) {
     circuit_free(c);
     return nullptr;
   }

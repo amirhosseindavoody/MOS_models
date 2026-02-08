@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   }
 
   if (verbose) {
-    circuit_print_summary(c);
+    CircuitPrintSummary(c);
     printf("\n");
   }
 
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
   // Run DC analysis
   printf("Running DC analysis...\n");
-  int iterations = circuit_dc_analysis(c, x, max_iter, tol_abs, tol_rel);
+  int iterations = CircuitDcAnalysis(c, x, max_iter, tol_abs, tol_rel);
 
   if (iterations < 0) {
     fprintf(stderr, "Error: DC analysis failed\n");
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
   }
 
   // Print results
-  circuit_print_solution(c, x);
+  CircuitPrintSolution(c, x);
 
   // Cleanup
   free(x);

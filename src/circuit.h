@@ -37,55 +37,46 @@ struct Circuit {
 // C-style API (snake_case) - primary implementation
 Circuit* circuit_create();
 void circuit_free(Circuit* c);
-int circuit_add_node(Circuit* c, const char* name);
-int circuit_get_node(Circuit* c, const char* name);
-int circuit_get_var_index(Circuit* c, int node_index);
-Device* circuit_add_device(Circuit* c, Device* d);
+
+// Add a node to the circuit.
+// Returns node index, or -1 on error.
+// Note: node index is not the same as variable index. Variable indices are
+//       assigned during finalization and only apply to non-ground nodes.
+// Note: Node names must be unique (except for ground which can be "0", "gnd",
+//       "GND", "ground").
+int CircuitAddNode(Circuit* c, const char* name);
+
+// Get node index by name. Returns -1 if not found.
+int CircuitGetNode(Circuit* c, const char* name);
+
+// Get variable index for a given node index. Returns -1 if invalid node index
+int CircuitGetVarIndex(Circuit* c, int node_index);
+
+// Add a device to the circuit. Returns the device pointer on success, nullptr
+// on error.
+Device* CircuitAddDevice(Circuit* c, Device* d);
 
 // Finalize the circuit: assign variable indices and prepare for analysis
 // Returns 0 on success, -1 on error
-int circuit_finalize(Circuit* c);
+int CircuitFinalize(Circuit* c);
 
 // PascalCase aliases for consumers expecting that style
 inline Circuit* CircuitCreate() { return circuit_create(); }
 inline void CircuitFree(Circuit* c) { circuit_free(c); }
-inline int CircuitAddNode(Circuit* c, const char* name) {
-  return circuit_add_node(c, name);
-}
-inline int CircuitGetNode(Circuit* c, const char* name) {
-  return circuit_get_node(c, name);
-}
-inline int CircuitGetVarIndex(Circuit* c, int node_index) {
-  return circuit_get_var_index(c, node_index);
-}
-inline Device* CircuitAddDevice(Circuit* c, Device* d) {
-  return circuit_add_device(c, d);
-}
-inline int CircuitFinalize(Circuit* c) { return circuit_finalize(c); }
 
 // =============================================================================
 // Analysis Functions
 // =============================================================================
 
 // Perform DC analysis using Newton-Raphson iteration
-int circuit_dc_analysis(Circuit* c, double* x, int max_iter, double tol_abs,
-                        double tol_rel);
+int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
+                      double tol_rel);
 
-// Print circuit summary
-void circuit_print_summary(Circuit* c);
+// Print circuit summary (number of nodes, devices, variables, etc.)
+void CircuitPrintSummary(Circuit* c);
 
-// Print solution
-void circuit_print_solution(Circuit* c, double* x);
-
-// PascalCase aliases
-inline int CircuitDcAnalysis(Circuit* c, double* x, int max_iter,
-                             double tol_abs, double tol_rel) {
-  return circuit_dc_analysis(c, x, max_iter, tol_abs, tol_rel);
-}
-inline void CircuitPrintSummary(Circuit* c) { circuit_print_summary(c); }
-inline void CircuitPrintSolution(Circuit* c, double* x) {
-  circuit_print_solution(c, x);
-}
+// Print solution vector (node voltages and extra variables)
+void CircuitPrintSolution(Circuit* c, double* x);
 
 }  // namespace minispice
 
