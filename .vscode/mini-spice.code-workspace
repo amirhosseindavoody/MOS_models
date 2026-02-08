@@ -154,11 +154,7 @@
         ],
         // CMake Tools extension settings
         "cmake.cmakePath": "${workspaceFolder}/.pixi/envs/default/bin/cmake",
-        "[cmake]": {
-            "editor.defaultFormatter": "KylinIdeTeam.cmake-intellisence",
-        },
         "cmake.configureOnEdit": false,
         "cmake.configureOnOpen": false,
-        "cmakeIntelliSence.cmakePath": "${workspaceFolder}/.pixi/envs/default/bin/cmake",
     }
 }

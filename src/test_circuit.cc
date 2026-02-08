@@ -1,4 +1,3 @@
-// test_circuit.cc
 // Unit tests for Circuit API and DC analysis
 
 #include <gtest/gtest.h>
@@ -8,7 +7,7 @@
 #include "circuit.h"
 #include "parser.h"
 
-using namespace minispice;
+namespace minispice {
 
 class CircuitTest : public ::testing::Test {
  protected:
@@ -339,3 +338,5 @@ C1 out 0 1u
   free(x);
   circuit_free(c);
 }
+
+}  // namespace minispice
