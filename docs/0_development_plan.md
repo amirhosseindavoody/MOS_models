@@ -87,7 +87,7 @@ The development can be broken down into the following phases:
     1.  Implement the time-stepping loop with pluggable integration methods.
     2.  Start with Backward Euler as the default integration method.
     3.  Create transient models for Capacitor and Inductor using `IntegrationMethod` coefficients.
-    4.  Implement `update_state()` hook for reactive devices to store history (voltage/current).
+    4.  Implement `UpdateState()` hook for reactive devices to store history (voltage/current).
     5.  Integrate transient models with NR solver inside the time-stepping loop.
     6.  Add support for time-varying sources (e.g., PWL, SIN, PULSE).
     7.  Write tests for simple transient circuits (e.g., RC charging, RL, RLC oscillation).

@@ -26,10 +26,17 @@ struct Device;
 
 // State passed to devices during Newton-Raphson iterations
 struct IterationState {
-  int iter;          /**< Current iteration number (0-based) */
-  double* x_current; /**< Current solution guess (length = num_vars) */
-  double tol_rel;    /**< Relative convergence tolerance */
-  double tol_abs;    /**< Absolute convergence tolerance */
+  // Current iteration number (0-based)
+  int iter;
+
+  // Current solution guess (length = num_vars)
+  double* x_current;
+
+  // Relative convergence tolerance
+  double tol_rel;
+
+  // Absolute convergence tolerance
+  double tol_abs;
 };
 
 // Integration method coefficients for time discretization

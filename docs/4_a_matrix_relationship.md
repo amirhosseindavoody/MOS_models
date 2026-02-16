@@ -40,7 +40,7 @@ Reactive elements are converted to equivalent DC stamps using a numerical integr
     $$
     I_{eq}=G_{eq}\left[v_{n-1}(n1)-v_{n-1}(n2)\right].
     $$
-  - `G_eq` is stamped into `A` using the same 2×2 pattern as a resistor; `I_eq` is added to the RHS `z` with the sign convention described in the texts (e.g., `ctx_add_z(n1, -I_eq); ctx_add_z(n2, +I_eq);`).
+  - `G_eq` is stamped into `A` using the same 2×2 pattern as a resistor; `I_eq` is added to the RHS `z` with the sign convention described in the texts (e.g., `CtxAddZ(n1, -I_eq); CtxAddZ(n2, +I_eq);`).
 
 - **Inductor** $L$ between `n1` and `n2` (with extra current variable index `k`):
   - Equivalent series resistance:
@@ -90,9 +90,9 @@ Reactive elements are converted to equivalent DC stamps using a numerical integr
 ## 6. Practical notes
 
 - Build `A` by summing local device derivatives into a `StampContext` (COO triplets) and convert to CSR/dense once per assembly.
-- Respect the RHS sign convention: for a current source from `n1` to `n2` call `ctx_add_z(n1_idx, -I); ctx_add_z(n2_idx, +I);`.
+- Respect the RHS sign convention: for a current source from `n1` to `n2` call `CtxAddZ(n1_idx, -I); CtxAddZ(n2_idx, +I);`.
 - For inductors remember to allocate an extra current variable and stamp its row/column accordingly.
 
 ---
 
-If you want, I can also produce a compact lookup table mapping each device type to the exact `ctx_add_A` / `ctx_add_z` calls required for implementation. Would you like that? 
+If you want, I can also produce a compact lookup table mapping each device type to the exact `CtxAddA` / `CtxAddZ` calls required for implementation. Would you like that? 

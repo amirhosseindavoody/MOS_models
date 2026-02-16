@@ -29,7 +29,7 @@ static bool IsGroundName(const char* name) {
 }
 
 // Simple dense linear solver using Gaussian elimination with partial pivoting
-static int solve_dense_system(int n, double* A, double* b, double* x) {
+static int SolveDenseSystem(int n, double* A, double* b, double* x) {
   // A is row-major n x n, b and x are length n
   // Uses in-place elimination on copies
 
@@ -327,7 +327,7 @@ int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
     memcpy(z, rhs, n * sizeof(double));
 
     // Solve A * x_new = z
-    int solve_result = solve_dense_system(n, A, z, x_new);
+    int solve_result = SolveDenseSystem(n, A, z, x_new);
     if (solve_result != 0) {
       fprintf(stderr, "DC analysis: solver failed at iteration %d\n", iter);
       CtxFree(ctx);

@@ -130,7 +130,7 @@ The simulator kernel loops over all devices, calling the appropriate hook for th
 1. Initialize x (e.g., all zeros or educated guess)
 2. **Newton–Raphson loop** (iterate until convergence):
    - Reset `StampContext`
-   - For each device: call `stamp_nonlinear()` with current x guess
+  - For each device: call `StampNonlinear()` with current x guess
    - Assemble Jacobian `A` and residual RHS based on device physics
    - Solve $A \cdot \Delta x = -F(x)$ for the Newton step
    - Update $x \gets x + \Delta x$
@@ -170,11 +170,11 @@ All methods convert differential equations into algebraic constraints by discret
    - Initialize x guess (e.g., $x_{n-1}$)
    - **NR iteration loop** (nonlinear transient):
      - Reset `StampContext`
-     - For each device: call `stamp_transient(ctx, ts)`
+    - For each device: call `StampTransient(ctx, ts)`
      - Assemble `A(x)` and `z(x)`
      - Solve for $\Delta x$; update x
      - Check convergence
-   - When converged, for each device: call `update_state(x, ts)` to store history
+  - When converged, for each device: call `UpdateState(x, ts)` to store history
    - Advance time: $t \gets t + h$; shift history ($x_{n-2} \gets x_{n-1}$; $x_{n-1} \gets x_n$)
    - Output time-series point
 
@@ -237,13 +237,13 @@ See [mna_stamps.md](mna_stamps.md) for all device stamps and [minimal_charge_bas
 **Purpose:** Collect device contributions without imposing matrix layout requirements.
 
 **Interface:**
-- `ctx_add_A(ctx, row, col, val)` — Append triplet
-- `ctx_add_z(ctx, idx, val)` — Add RHS
-- `ctx_alloc_extra_var()` — Allocate variable index for device use
-- `ctx_assemble_matrix()` — Convert triplets (COO) to solver format (CSR or dense)
+- `CtxAddA(ctx, row, col, val)` — Append triplet
+- `CtxAddZ(ctx, idx, val)` — Add RHS
+- `CtxAllocExtraVar()` — Allocate variable index for device use
+- `CtxAssembleDense()` — Convert triplets (COO) to solver format (CSR or dense)
 
 **Semantics:**
-- Multiple calls to `ctx_add_A` for the same (row, col) **accumulate**
+- Multiple calls to `CtxAddA` for the same (row, col) **accumulate**
 - Sign conventions must be respected (current injections vs. extractions)
 - Assembly is **non-destructive** unless explicitly reset
 
@@ -318,9 +318,9 @@ Circuit: Vdd=10V -> R1=1k -> R2=1k -> GND
 2. Finalize circuit → Node indices: GND=0, mid=1, Vdd=2; 1 extra var (V-source current)
 3. Initialize NR: $x = [0, 5, 10, 0]$ (guess)
 4. **NR Iteration 1:**
-   - Resistor 1: `stamp_nonlinear()` → $g = 0.001$, constant Jacobian contribution
-   - Resistor 2: `stamp_nonlinear()` → $g = 0.001$, constant Jacobian contribution
-   - Voltage source: `stamp_nonlinear()` → enforce $V_{dd} = 10$
+  - Resistor 1: `StampNonlinear()` → $g = 0.001$, constant Jacobian contribution
+  - Resistor 2: `StampNonlinear()` → $g = 0.001$, constant Jacobian contribution
+  - Voltage source: `StampNonlinear()` → enforce $V_{dd} = 10$
    - Assemble: $A$ matrix, $z$
    - Solve for $\Delta x$ (should be zero for linear circuit)
    - Check convergence: $||\Delta x|| < \epsilon$ → **CONVERGED in 1 iteration**
@@ -338,8 +338,8 @@ Circuit: Vdd=5V -> R=1k -> Diode -> GND
 1. Parse and finalize: Nodes (Vdd, anode, GND); 1 resistor, 1 diode, 1 V-source
 2. Initialize NR: $x = [0, 0.6, 5]$ (guess diode anode ~0.6V, Vdd=5V)
 3. **NR Iteration 1:**
-   - Resistor: `stamp_nonlinear()` → conductance $g = 0.001$ (constant)
-   - Diode: `stamp_nonlinear()` → compute $I_d$ and $g_{eq}$ for current x guess
+  - Resistor: `StampNonlinear()` → conductance $g = 0.001$ (constant)
+  - Diode: `StampNonlinear()` → compute $I_d$ and $g_{eq}$ for current x guess
      - If $V_d = 0.6V$, then $I_d \approx I_s e^{0.6/(nV_t)}$
      - Linearized conductance: $g_{eq} = dI_d/dV_d = (I_s/(nV_t))e^{0.6/(nV_t)}$
    - Voltage source: enforce $V_{dd} = 5V$
@@ -364,13 +364,13 @@ Circuit: Vsrc (PWL: 0→5V at t=0) -> R -> C -> GND
    - Set time-step state: $h$, $t$, $x_{prev}$
    - Initialize NR: $x = x_{prev}$
    - **NR iteration loop:**
-     - Resistor: `stamp_nonlinear()` → adds conductance
-     - Capacitor: `stamp_nonlinear()` → adds $G_{eq} = C/h$ and history RHS $I_{eq} = G_{eq}(v_{prev})$
-     - Voltage source: enforces $V_{src}(t)$ (time-varying if PWL, SIN, etc.)
+    - Resistor: `StampNonlinear()` → adds conductance
+    - Capacitor: `StampNonlinear()` → adds $G_{eq} = C/h$ and history RHS $I_{eq} = G_{eq}(v_{prev})`
+    - Voltage source: `StampNonlinear()` → enforces $V_{src}(t)$ (time-varying if PWL, SIN, etc.)
      - Assemble and solve for $\Delta x$
      - Check convergence: $||\Delta x|| < \epsilon$
    - When converged:
-     - Capacitor: `update_state()` → stores $v_{prev,new} = x_{capacitor}$
+    - Capacitor: `UpdateState()` → stores $v_{prev,new} = x_{capacitor}$
      - Advance $t \gets t + h$; $x_{prev} \gets x$
      - Record $(t, x)$ for output
 4. Plot voltage rise curve: exponential charging with time constant $RC \approx 1 \mu s$
