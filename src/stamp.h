@@ -164,30 +164,6 @@ double* CtxGetZ(StampContext* ctx);
  */
 void CtxAssembleDense(StampContext* ctx, double* matrix);
 
-// ----------------------------------------------------------------------------
-// C-style aliases (snake_case) for compatibility with tests and docs
-// ----------------------------------------------------------------------------
-inline StampContext* ctx_create(int num_vars) { return CtxCreate(num_vars); }
-inline void ctx_free(StampContext* ctx) { CtxFree(ctx); }
-inline void ctx_reset(StampContext* ctx) { CtxReset(ctx); }
-inline void ctx_add_A(StampContext* ctx, int row, int col, double val) {
-  CtxAddA(ctx, row, col, val);
-}
-inline void ctx_add_z(StampContext* ctx, int idx, double val) {
-  CtxAddZ(ctx, idx, val);
-}
-inline int ctx_alloc_extra_var(StampContext* ctx) {
-  return CtxAllocExtraVar(ctx);
-}
-inline int ctx_get_num_vars(StampContext* ctx) { return CtxGetNumVars(ctx); }
-inline const Triplet* ctx_get_triplets(StampContext* ctx, size_t* count) {
-  return CtxGetTriplets(ctx, count);
-}
-inline double* ctx_get_z(StampContext* ctx) { return CtxGetZ(ctx); }
-inline void ctx_assemble_dense(StampContext* ctx, double* matrix) {
-  CtxAssembleDense(ctx, matrix);
-}
-
 }  // namespace minispice
 
 #endif  // MINI_SPICE_STAMP_H_

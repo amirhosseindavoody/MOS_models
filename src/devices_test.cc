@@ -14,13 +14,13 @@ using namespace minispice;
 class DeviceTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    ctx = ctx_create(4);
+    ctx = CtxCreate(4);
     ASSERT_NE(ctx, nullptr);
   }
 
   void TearDown() override {
     if (ctx) {
-      ctx_free(ctx);
+      CtxFree(ctx);
       ctx = nullptr;
     }
   }
@@ -50,7 +50,7 @@ TEST_F(DeviceTest, ResistorStamp) {
   r->vt->StampNonlinear(r, ctx, &it);
 
   double matrix[16] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // g = 1/1000 = 0.001
   double g = 0.001;
@@ -71,7 +71,7 @@ TEST_F(DeviceTest, ResistorWithGroundNode) {
   r->vt->StampNonlinear(r, ctx, &it);
 
   double matrix[16] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // Only A[0][0] should be set
   double g = 0.001;
@@ -102,10 +102,10 @@ TEST_F(DeviceTest, CurrentSourceStamp) {
 
   // Current source only affects RHS
   size_t count;
-  ctx_get_triplets(ctx, &count);
+  CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 0u);  // No matrix entries
 
-  double* z = ctx_get_z(ctx);
+  double* z = CtxGetZ(ctx);
   EXPECT_DOUBLE_EQ(z[0], -0.001);  // z[n1] -= I
   EXPECT_DOUBLE_EQ(z[1], +0.001);  // z[n2] += I
 
@@ -120,7 +120,8 @@ TEST_F(DeviceTest, VoltageSourceCreation) {
   Device* v = CreateVoltageSource("V1", 0, 1, 5.0);
   ASSERT_NE(v, nullptr);
   EXPECT_STREQ(v->name, "V1");
-  EXPECT_EQ(v->extra_var, -1);  // Will be set after init
+  EXPECT_EQ(v->extra_var,
+            -2);  // Should request extra variable for branch current
   DeviceFree(v);
 }
 
@@ -137,8 +138,8 @@ TEST_F(DeviceTest, VoltageSourceInit) {
 
 TEST_F(DeviceTest, VoltageSourceStamp) {
   // Create a fresh context with 3 variables (2 nodes + 1 extra)
-  ctx_free(ctx);
-  ctx = ctx_create(3);
+  CtxFree(ctx);
+  ctx = CtxCreate(3);
 
   Device* v = CreateVoltageSource("V1", 0, 1, 5.0);
   ASSERT_NE(v, nullptr);
@@ -150,7 +151,7 @@ TEST_F(DeviceTest, VoltageSourceStamp) {
   v->vt->StampNonlinear(v, ctx, &it);
 
   double matrix[9] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // Voltage source stamp with n1=0, n2=1, k=2:
   // A[0][2] = +1, A[1][2] = -1
@@ -160,7 +161,7 @@ TEST_F(DeviceTest, VoltageSourceStamp) {
   EXPECT_DOUBLE_EQ(matrix[2 * 3 + 0], 1.0);   // A[k][0]
   EXPECT_DOUBLE_EQ(matrix[2 * 3 + 1], -1.0);  // A[k][1]
 
-  double* z = ctx_get_z(ctx);
+  double* z = CtxGetZ(ctx);
   EXPECT_DOUBLE_EQ(z[2], 5.0);  // z[k] = V
 
   DeviceFree(v);
@@ -182,7 +183,7 @@ TEST_F(DeviceTest, CapacitorDCStamp) {
 
   // In DC, capacitor is open circuit - no stamp
   size_t count;
-  ctx_get_triplets(ctx, &count);
+  CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 0u);
 
   DeviceFree(c);
@@ -194,8 +195,8 @@ TEST_F(DeviceTest, CapacitorDCStamp) {
 
 TEST_F(DeviceTest, InductorDCStamp) {
   // Create context with extra variable for inductor
-  ctx_free(ctx);
-  ctx = ctx_create(3);
+  CtxFree(ctx);
+  ctx = CtxCreate(3);
 
   Device* l = CreateInductor("L1", 0, 1, 1e-3);
   ASSERT_NE(l, nullptr);
@@ -208,7 +209,7 @@ TEST_F(DeviceTest, InductorDCStamp) {
   l->vt->StampNonlinear(l, ctx, &it);
 
   double matrix[9] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // In DC, inductor is short circuit (like V=0 voltage source)
   EXPECT_DOUBLE_EQ(matrix[0 * 3 + 2], 1.0);   // A[0][k]
@@ -240,7 +241,7 @@ TEST_F(DeviceTest, DiodeStampAtZeroBias) {
 
   // At Vd=0: g_eq = Is/(nVt) * exp(0) = Is/Vt, I_eq = 0 - g_eq * 0 = 0
   double matrix[16] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // Conductance should be very small but non-zero
   EXPECT_GT(matrix[0 * 4 + 0], 0.0);
@@ -258,7 +259,7 @@ TEST_F(DeviceTest, DiodeStampForwardBias) {
   d->vt->StampNonlinear(d, ctx, &it);
 
   double matrix[16] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // Conductance should be significant at forward bias
   double g = matrix[0 * 4 + 0];

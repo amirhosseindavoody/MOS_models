@@ -61,12 +61,13 @@ TEST_F(CircuitTest, GroundNodeHandling) {
   EXPECT_EQ(g4, 0);
 }
 
+// Adding duplicate node names should return existing index
 TEST_F(CircuitTest, DuplicateNodes) {
   int n1 = CircuitAddNode(c, "out");
   int n2 = CircuitAddNode(c, "out");  // Same name
 
   EXPECT_EQ(n1, n2);
-  EXPECT_EQ(c->num_nodes, 2);  // Only one node added
+  EXPECT_EQ(c->num_nodes, 2);  // Only one node added + ground
 }
 
 TEST_F(CircuitTest, AddDevices) {

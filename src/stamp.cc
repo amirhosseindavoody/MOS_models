@@ -16,9 +16,17 @@ namespace minispice {
 // ============================================================================
 
 struct StampContext {
+  // Number of variables (including extra vars for voltage sources, inductors,
+  // etc.)
   int num_vars_;
+
+  // Number of extra variables allocated (for tracking)
   int num_extra_allocated_;
+
+  // Internal storage for triplets and RHS vector
   std::vector<Triplet> triplets_;
+
+  // RHS vector (length = num_vars_)
   std::vector<double> z_;
 };
 

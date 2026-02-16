@@ -1,24 +1,24 @@
 // test_stamp.cc
 // Unit tests for StampContext API
 
+#include "stamp.h"
+
 #include <gtest/gtest.h>
 
 #include <cstring>
-
-#include "stamp.h"
 
 using namespace minispice;
 
 class StampContextTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    ctx = ctx_create(4);
+    ctx = CtxCreate(4);
     ASSERT_NE(ctx, nullptr);
   }
 
   void TearDown() override {
     if (ctx) {
-      ctx_free(ctx);
+      CtxFree(ctx);
       ctx = nullptr;
     }
   }
@@ -28,37 +28,37 @@ class StampContextTest : public ::testing::Test {
 
 TEST_F(StampContextTest, CreateAndFree) {
   // Test basic creation (already done in SetUp)
-  EXPECT_EQ(ctx_get_num_vars(ctx), 4);
+  EXPECT_EQ(CtxGetNumVars(ctx), 4);
 }
 
 TEST_F(StampContextTest, CreateWithZeroVars) {
-  StampContext* bad = ctx_create(0);
+  StampContext* bad = CtxCreate(0);
   EXPECT_EQ(bad, nullptr);
 }
 
 TEST_F(StampContextTest, CreateWithNegativeVars) {
-  StampContext* bad = ctx_create(-5);
+  StampContext* bad = CtxCreate(-5);
   EXPECT_EQ(bad, nullptr);
 }
 
 TEST_F(StampContextTest, AddTriplets) {
-  ctx_add_A(ctx, 0, 0, 1.0);
-  ctx_add_A(ctx, 0, 1, 2.0);
-  ctx_add_A(ctx, 1, 0, 3.0);
-  ctx_add_A(ctx, 1, 1, 4.0);
+  CtxAddA(ctx, 0, 0, 1.0);
+  CtxAddA(ctx, 0, 1, 2.0);
+  CtxAddA(ctx, 1, 0, 3.0);
+  CtxAddA(ctx, 1, 1, 4.0);
 
   size_t count;
-  const Triplet* triplets = ctx_get_triplets(ctx, &count);
+  const Triplet* triplets = CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 4u);
   EXPECT_NE(triplets, nullptr);
 }
 
 TEST_F(StampContextTest, AddRHS) {
-  ctx_add_z(ctx, 0, 1.5);
-  ctx_add_z(ctx, 1, 2.5);
-  ctx_add_z(ctx, 2, 3.5);
+  CtxAddZ(ctx, 0, 1.5);
+  CtxAddZ(ctx, 1, 2.5);
+  CtxAddZ(ctx, 2, 3.5);
 
-  double* z = ctx_get_z(ctx);
+  double* z = CtxGetZ(ctx);
   EXPECT_NE(z, nullptr);
   EXPECT_DOUBLE_EQ(z[0], 1.5);
   EXPECT_DOUBLE_EQ(z[1], 2.5);
@@ -67,40 +67,40 @@ TEST_F(StampContextTest, AddRHS) {
 }
 
 TEST_F(StampContextTest, AccumulateSameEntry) {
-  ctx_add_A(ctx, 0, 0, 1.0);
-  ctx_add_A(ctx, 0, 0, 2.0);
-  ctx_add_A(ctx, 0, 0, 3.0);
+  CtxAddA(ctx, 0, 0, 1.0);
+  CtxAddA(ctx, 0, 0, 2.0);
+  CtxAddA(ctx, 0, 0, 3.0);
 
   // Three separate triplets, but will sum to 6.0 when assembled
   size_t count;
-  const Triplet* triplets = ctx_get_triplets(ctx, &count);
+  const Triplet* triplets = CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 3u);
 
   double matrix[16] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
   EXPECT_DOUBLE_EQ(matrix[0], 6.0);  // A[0][0] = 1.0 + 2.0 + 3.0
 }
 
 TEST_F(StampContextTest, AccumulateRHS) {
-  ctx_add_z(ctx, 0, 1.0);
-  ctx_add_z(ctx, 0, 2.0);
-  ctx_add_z(ctx, 0, 3.0);
+  CtxAddZ(ctx, 0, 1.0);
+  CtxAddZ(ctx, 0, 2.0);
+  CtxAddZ(ctx, 0, 3.0);
 
-  double* z = ctx_get_z(ctx);
+  double* z = CtxGetZ(ctx);
   EXPECT_DOUBLE_EQ(z[0], 6.0);
 }
 
 TEST_F(StampContextTest, Reset) {
-  ctx_add_A(ctx, 0, 0, 5.0);
-  ctx_add_z(ctx, 0, 10.0);
+  CtxAddA(ctx, 0, 0, 5.0);
+  CtxAddZ(ctx, 0, 10.0);
 
-  ctx_reset(ctx);
+  CtxReset(ctx);
 
   size_t count;
-  ctx_get_triplets(ctx, &count);
+  CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 0u);
 
-  double* z = ctx_get_z(ctx);
+  double* z = CtxGetZ(ctx);
   EXPECT_DOUBLE_EQ(z[0], 0.0);
 }
 
@@ -108,13 +108,13 @@ TEST_F(StampContextTest, AssembleDense) {
   // Build a 2x2 system
   // [ 2, -1 ]
   // [-1,  2 ]
-  ctx_add_A(ctx, 0, 0, 2.0);
-  ctx_add_A(ctx, 0, 1, -1.0);
-  ctx_add_A(ctx, 1, 0, -1.0);
-  ctx_add_A(ctx, 1, 1, 2.0);
+  CtxAddA(ctx, 0, 0, 2.0);
+  CtxAddA(ctx, 0, 1, -1.0);
+  CtxAddA(ctx, 1, 0, -1.0);
+  CtxAddA(ctx, 1, 1, 2.0);
 
   double matrix[16] = {0};
-  ctx_assemble_dense(ctx, matrix);
+  CtxAssembleDense(ctx, matrix);
 
   // Row-major order: matrix[row * 4 + col]
   EXPECT_DOUBLE_EQ(matrix[0 * 4 + 0], 2.0);
@@ -125,23 +125,23 @@ TEST_F(StampContextTest, AssembleDense) {
 
 TEST_F(StampContextTest, IgnoreOutOfBounds) {
   // These should be silently ignored
-  ctx_add_A(ctx, -1, 0, 1.0);
-  ctx_add_A(ctx, 0, -1, 1.0);
-  ctx_add_A(ctx, 4, 0, 1.0);
-  ctx_add_A(ctx, 0, 4, 1.0);
-  ctx_add_z(ctx, -1, 1.0);
-  ctx_add_z(ctx, 4, 1.0);
+  CtxAddA(ctx, -1, 0, 1.0);
+  CtxAddA(ctx, 0, -1, 1.0);
+  CtxAddA(ctx, 4, 0, 1.0);
+  CtxAddA(ctx, 0, 4, 1.0);
+  CtxAddZ(ctx, -1, 1.0);
+  CtxAddZ(ctx, 4, 1.0);
 
   size_t count;
-  ctx_get_triplets(ctx, &count);
+  CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 0u);
 }
 
 TEST_F(StampContextTest, IgnoreZeroValues) {
-  ctx_add_A(ctx, 0, 0, 0.0);
+  CtxAddA(ctx, 0, 0, 0.0);
 
   size_t count;
-  ctx_get_triplets(ctx, &count);
+  CtxGetTriplets(ctx, &count);
   EXPECT_EQ(count, 0u);  // Zero entries should be skipped
 }
 

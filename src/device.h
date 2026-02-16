@@ -30,16 +30,29 @@ struct DeviceVTable {
 
 // Generic device structure
 struct Device {
-  const DeviceVTable* vt;  // Pointer to device's vtable
-  char name[32];           // Device name (e.g., "R1", "V1")
-  int nodes[4];            // Terminal variable indices (-1 for unused)
-  void* params;            // Device-specific parameters
-  void* state;             // Device-specific state (history, etc.)
-  int extra_var;           // Extra variable index (for V-sources, L)
-                  // Note: extra_var is -1 if not used, or the index of the
-                  // extra variable in the MNA system if used
-                  // extra_var is set to -2 during initialization to request
-                  // allocation of an extra variable by circuit_finalize
+  // Pointer to device's vtable
+  const DeviceVTable* vt;
+
+  // Device name (e.g., "R1", "V1")
+  char name[32];
+
+  // Terminal variable indices (-1 for unused)
+  int nodes[4];
+
+  // Device-specific parameters
+  void* params;
+
+  // Device-specific state (history, etc.)
+  void* state;
+
+  // Extra variable index (for V-sources, L)
+  // - extra_var is -1 if not used,
+  // - extra_var is -2 during initialization to request allocation of an extra
+  //   variable by circuit_finalize,
+  // - After initialization, extra_var is the index of the extra variable in the
+  //   MNA system
+  int extra_var;
+
   Device* next;  // Next device in circuit's linked list
 };
 

@@ -229,7 +229,7 @@ int CircuitFinalize(Circuit* c) {
   if (!c) return -1;
   if (c->finalized) return 0;  // Already finalized
 
-  // Assign variable indices to non-ground nodes
+  // Initial pass to assign variable indices to nodes and node variables
   int var_idx = 0;
   for (int i = 0; i < c->num_nodes; i++) {
     if (i == 0) {
@@ -240,30 +240,20 @@ int CircuitFinalize(Circuit* c) {
   }
 
   c->num_vars = var_idx;
-  c->num_extra_vars = 0;
-
-  // Initialize all devices and count extra variables
-  // First pass: count extra vars needed
-  for (Device* d = c->devices; d; d = d->next) {
-    // Voltage sources and inductors need extra variables
-    // This is handled by the device's init function
-    d->extra_var = -1;
+  if (c->num_vars <= 0) {
+    return -1;
   }
 
-  // Create a temporary context to allocate extra variables
-  StampContext* ctx = ctx_create(c->num_vars);
-  if (!ctx) return -1;
+  c->num_extra_vars = 0;
 
-  // Initialize devices - they may allocate extra variables
+  // Second pass to initialize devices and count extra variables needed
   for (Device* d = c->devices; d; d = d->next) {
+    // Initialize device (may set extra_var to -2 to request allocation)
     if (d->vt && d->vt->Init) {
       d->vt->Init(d, c);
     }
-  }
 
-  // Now allocate extra vars for devices that need them
-  // Voltage sources mark extra_var as -2 to request allocation
-  for (Device* d = c->devices; d; d = d->next) {
+    // Allocate extra variable if requested
     if (d->extra_var == -2) {
       d->extra_var = c->num_vars + c->num_extra_vars;
       c->num_extra_vars++;
@@ -271,8 +261,6 @@ int CircuitFinalize(Circuit* c) {
   }
 
   c->num_vars += c->num_extra_vars;
-
-  ctx_free(ctx);
 
   c->finalized = 1;
   return 0;
@@ -303,7 +291,7 @@ int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
   // Initialize solution guess to zero
   memset(x, 0, n * sizeof(double));
 
-  StampContext* ctx = ctx_create(n);
+  StampContext* ctx = CtxCreate(n);
   if (!ctx) {
     free(A);
     free(z);
@@ -322,7 +310,7 @@ int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
     it.x_current = x;
 
     // Reset and stamp
-    ctx_reset(ctx);
+    CtxReset(ctx);
 
     for (Device* d = c->devices; d; d = d->next) {
       if (d->vt && d->vt->StampNonlinear) {
@@ -332,17 +320,17 @@ int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
 
     // Assemble matrix
     memset(A, 0, n * n * sizeof(double));
-    ctx_assemble_dense(ctx, A);
+    CtxAssembleDense(ctx, A);
 
     // Get RHS
-    double* rhs = ctx_get_z(ctx);
+    double* rhs = CtxGetZ(ctx);
     memcpy(z, rhs, n * sizeof(double));
 
     // Solve A * x_new = z
     int solve_result = solve_dense_system(n, A, z, x_new);
     if (solve_result != 0) {
       fprintf(stderr, "DC analysis: solver failed at iteration %d\n", iter);
-      ctx_free(ctx);
+      CtxFree(ctx);
       free(A);
       free(z);
       free(x_new);
@@ -379,7 +367,7 @@ int CircuitDcAnalysis(Circuit* c, double* x, int max_iter, double tol_abs,
     }
   }
 
-  ctx_free(ctx);
+  CtxFree(ctx);
   free(A);
   free(z);
   free(x_new);

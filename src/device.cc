@@ -139,7 +139,7 @@ struct VoltageSourceParams {
 
 static void VoltageSourceInit(Device* d, Circuit* c) {
   (void)c;
-  d->extra_var = -2;
+  (void)d;
 }
 
 static void VoltageSourceStampNonlinear(Device* d, StampContext* ctx,
@@ -495,9 +495,9 @@ Device* CreateResistor(const char* name, int n1, int n2, double resistance) {
   strncpy(d->name, name ? name : "R?", sizeof(d->name) - 1);
   d->nodes[0] = n1;
   d->nodes[1] = n2;
-  d->nodes[2] = -1;
-  d->nodes[3] = -1;
-  d->extra_var = -1;
+  d->nodes[2] = -1;   // Unused
+  d->nodes[3] = -1;   // Unused
+  d->extra_var = -1;  // No extra variable needed for resistor
 
   ResistorParams* p =
       static_cast<ResistorParams*>(malloc(sizeof(ResistorParams)));
@@ -517,9 +517,9 @@ Device* CreateCurrentSource(const char* name, int n1, int n2, double current) {
   strncpy(d->name, name ? name : "I?", sizeof(d->name) - 1);
   d->nodes[0] = n1;
   d->nodes[1] = n2;
-  d->nodes[2] = -1;
-  d->nodes[3] = -1;
-  d->extra_var = -1;
+  d->nodes[2] = -1;   // Unused
+  d->nodes[3] = -1;   // Unused
+  d->extra_var = -1;  // No extra variable needed for current source
 
   CurrentSourceParams* p =
       static_cast<CurrentSourceParams*>(malloc(sizeof(CurrentSourceParams)));
@@ -539,9 +539,9 @@ Device* CreateVoltageSource(const char* name, int n1, int n2, double voltage) {
   strncpy(d->name, name ? name : "V?", sizeof(d->name) - 1);
   d->nodes[0] = n1;
   d->nodes[1] = n2;
-  d->nodes[2] = -1;
-  d->nodes[3] = -1;
-  d->extra_var = -1;
+  d->nodes[2] = -1;   // Unused
+  d->nodes[3] = -1;   // Unused
+  d->extra_var = -2;  // Request extra variable for branch current
 
   VoltageSourceParams* p =
       static_cast<VoltageSourceParams*>(malloc(sizeof(VoltageSourceParams)));
